@@ -1,0 +1,1 @@
+{{ $properties->appends(request()->query())->links() }}
