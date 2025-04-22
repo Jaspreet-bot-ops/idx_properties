@@ -10,7 +10,7 @@ use App\Models\Property;
 
 class GeocodeProperties extends Command
 {
-    protected $signature = 'geocode:properties {--limit=100} {--force : Force refresh all geocoding} {--debug : Show detailed error messages}';
+    protected $signature = 'geocode:properties {--limit=100} {--start=} {--force : Force refresh all geocoding} {--debug : Show detailed error messages}';
     
     protected $description = 'Geocode property addresses using Mapbox API';
     
@@ -86,37 +86,45 @@ class GeocodeProperties extends Command
     public function handle()
     {
         $this->info('Starting property geocoding process...');
-    
+        
         $limit = (int) $this->option('limit') ?? 1000;
         $force = $this->option('force');
         $debug = $this->option('debug');
-    
+        $startId = (int) $this->option('start');
+        
         $totalProcessed = 0;
         $totalErrors = 0;
-    
+        
         try {
             do {
                 // Fetch a batch
                 $query = Property::query()->whereNotNull('UnparsedAddress');
-    
+                
+                // Add the startId condition if provided
+                if ($startId > 0) {
+                    $query->where('id', '>=', $startId);
+                    // Only apply startId for the first batch
+                    $startId = 0;
+                }
+                
                 if (!$force) {
                     $query->where(function ($q) {
                         $q->whereNull('Latitude')->orWhereNull('Longitude');
                     });
                 }
-    
+                
                 $properties = $query->take($limit)->get();
-    
+                
                 if ($properties->isEmpty()) {
                     break;
                 }
-    
+                
                 $updates = [];
-    
+                
                 foreach ($properties as $property) {
                     try {
                         $geocodeData = $this->getGeocodeData($property);
-    
+                        
                         if ($geocodeData) {
                             $updates[] = [
                                 'id' => $property->id,
@@ -125,24 +133,24 @@ class GeocodeProperties extends Command
                                 'Country' => $geocodeData['country'],
                             ];
                             $totalProcessed++;
-    
+                            
                             if ($debug) {
                                 $this->info("Geocoded: {$property->ListingKey}");
                             }
                         }
                     } catch (\Exception $e) {
                         $totalErrors++;
-    
+                        
                         if ($debug) {
                             $this->error("Error geocoding {$property->ListingKey}: " . $e->getMessage());
                         }
-    
+                        
                         Log::error("Error geocoding {$property->ListingKey}: " . $e->getMessage(), [
                             'exception' => $e
                         ]);
                     }
                 }
-    
+                
                 // Bulk update
                 foreach ($updates as $update) {
                     Property::where('id', $update['id'])->update([
@@ -151,13 +159,12 @@ class GeocodeProperties extends Command
                         'Country' => $update['Country'],
                     ]);
                 }
-    
             } while ($properties->count() === $limit);
-    
+            
             $this->info("Geocoding completed:");
             $this->info("- Successfully processed: {$totalProcessed}");
             $this->info("- Errors: {$totalErrors}");
-    
+            
             return 0;
         } catch (\Exception $e) {
             $this->error('An error occurred: ' . $e->getMessage());
@@ -165,6 +172,7 @@ class GeocodeProperties extends Command
             return 1;
         }
     }
+    
     
     protected function getGeocodeData($property)
     {
