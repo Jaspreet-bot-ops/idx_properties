@@ -76,6 +76,9 @@
             <p><strong>Address:</strong> {{ $property->StreetNumber }} {{ $property->StreetName }}
                 {{ $property->StreetSuffix }}, {{ $property->City }}, {{ $property->StateOrProvince }}
                 {{ $property->PostalCode }}</p>
+                <p><strong>Country:</strong> {{ $property->Country ?? 'N/A' }}</p>
+            <p><strong>Latitude:</strong> {{ $property->Latitude ?? 'N/A' }}</p>
+            <p><strong>Longitude:</strong> {{ $property->Longitude ?? 'N/A' }}</p>
             <p><strong>Status:</strong> {{ $property->StandardStatus }}</p>
             <p><strong>Agent:</strong> {{ $property->ListAgentFullName }}</p>
         </div>
