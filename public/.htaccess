@@ -23,3 +23,8 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# Use PHP 8.2 for this directory
+<FilesMatch "\.php$">
+    SetHandler "proxy:unix:/run/php/php8.2-fpm.sock|fcgi://localhost"
+</FilesMatch>
