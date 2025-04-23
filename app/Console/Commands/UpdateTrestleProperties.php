@@ -314,6 +314,10 @@ class UpdateTrestleProperties extends Command
         $totalVerified = 0;
         $totalDiscrepancies = 0;
 
+        // Create arrays to store listing keys for logging
+        $insertedListingKeys = [];
+        $updatedListingKeys = [];
+
         while ($morePropertiesAvailable) {
             try {
                 // Build the OData query
@@ -388,8 +392,14 @@ class UpdateTrestleProperties extends Command
                             if (!$exists) {
                                 $property = new Property();
                                 $inserted++;
+                                // Log the inserted listing key
+                                $insertedListingKeys[] = $listingKey;
+                                Log::info("Inserting new property", ['ListingKey' => $listingKey]);
                             } else {
                                 $updated++;
+                                // Log the updated listing key
+                                $updatedListingKeys[] = $listingKey;
+                                Log::info("Updating existing property", ['ListingKey' => $listingKey]);
                             }
 
                             // Map property data to model
@@ -511,6 +521,17 @@ class UpdateTrestleProperties extends Command
                 break;
             }
         }
+
+        // Log summary of inserted and updated listing keys
+        Log::info("Properties inserted", [
+            'count' => count($insertedListingKeys),
+            'listing_keys' => $insertedListingKeys
+        ]);
+
+        Log::info("Properties updated", [
+            'count' => count($updatedListingKeys),
+            'listing_keys' => $updatedListingKeys
+        ]);
 
         $this->info("Overall processing completed:");
         $this->info("- Total processed: $totalProcessed");
