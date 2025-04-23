@@ -281,6 +281,11 @@ class PropertyController extends Controller
             $query->where('country', 'like', "%{$request->country}%");
         }
 
+        $sortBy = $request->get('sort_by', 'PropertyType'); // Default sort by 'PropertyType'
+        $sortDirection = $request->get('sort_direction', 'asc'); // Default sort direction is 'asc'
+    
+        $query->orderBy($sortBy, $sortDirection);
+        
         $properties = $query->paginate(10);
 
         if ($request->ajax()) {

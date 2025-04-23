@@ -309,6 +309,13 @@
                                 {{ $property->City }}, {{ $property->StateOrProvince }} {{ $property->PostalCode }}
                             </div>
                         </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Unit Number</div>
+                            <div class="admin-data-value">
+                                {{ $property->UnitNumber }}
+                            </div>
+                        </div>
                         
                         <div class="admin-data-item">
                             <div class="admin-data-label">Bedrooms</div>

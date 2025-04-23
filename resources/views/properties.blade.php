@@ -34,11 +34,36 @@
                             <thead class="bg-gray-100 text-xs uppercase text-gray-700">
                                 <tr>
                                     <th class="px-4 py-2">Listing Key</th>
-                                    <th class="px-4 py-2">Type</th>
+                                    <th class="px-4 py-2">
+                                        <a href="{{ route('properties', array_merge(request()->query(), ['sort_by' => 'PropertyType', 'sort_direction' => (request('sort_by') == 'PropertyType' && request('sort_direction') == 'asc') ? 'desc' : 'asc'])) }}"
+                                           class="text-gray-700 hover:underline">
+                                            Type
+                                            @if(request('sort_by') == 'PropertyType')
+                                                @if(request('sort_direction') == 'asc')
+                                                    <span>&#x2191;</span> <!-- Ascending arrow -->
+                                                @else
+                                                    <span>&#x2193;</span> <!-- Descending arrow -->
+                                                @endif
+                                            @endif
+                                        </a>
+                                    </th>
                                     <th class="px-4 py-2">Price</th>
                                     <th class="px-4 py-2">Beds</th>
                                     <th class="px-4 py-2">Baths</th>
                                     <th class="px-4 py-2">Area (sqft)</th>
+                                    <th class="px-4 py-2">
+                                        <a href="{{ route('properties', array_merge(request()->query(), ['sort_by' => 'UnitNumber', 'sort_direction' => (request('sort_by') == 'UnitNumber' && request('sort_direction') == 'asc') ? 'desc' : 'asc'])) }}"
+                                           class="text-gray-700 hover:underline">
+                                            Unit Number
+                                            @if(request('sort_by') == 'UnitNumber')
+                                                @if(request('sort_direction') == 'asc')
+                                                    <span>&#x2191;</span> <!-- Ascending arrow -->
+                                                @else
+                                                    <span>&#x2193;</span> <!-- Descending arrow -->
+                                                @endif
+                                            @endif
+                                        </a>
+                                    </th>
                                     <th class="px-4 py-2">Address</th>
                                     <th class="px-4 py-2">City</th>
                                     <th class="px-4 py-2">Status</th>
@@ -58,6 +83,7 @@
                                             {{ $property->BathroomsHalf ? '½' : '' }}
                                         </td>
                                         <td class="px-4 py-2">{{ $property->LivingArea }}</td>
+                                        <td class="px-4 py-2">{{ $property->UnitNumber }}</td>
                                         <td class="px-4 py-2">
                                             {{ $property->UnparsedAddress }}
                                         </td>
@@ -259,4 +285,3 @@
         });
     </script>
 </x-app-layout>
-
