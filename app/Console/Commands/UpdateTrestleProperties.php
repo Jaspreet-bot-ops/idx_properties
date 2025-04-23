@@ -21,7 +21,7 @@ class UpdateTrestleProperties extends Command
      *
      * @var string
      */
-    protected $signature = 'update:trestle-properties {--hours=1 : Hours to look back for updates} {--debug : Show detailed error messages}';
+    protected $signature = 'update:trestle-properties {--hours=1 : Hours to look back for updates} {--debug : Show detailed error messages} {--geocode : Geocode property addresses}';
 
     /**
      * The console command description.
@@ -44,8 +44,214 @@ class UpdateTrestleProperties extends Command
     /**
      * Execute the console command.
      */
+    // public function handle()
+    // {
+    //     $this->info('Starting Trestle property update process...');
+
+    //     // Load credentials from environment variables
+    //     $this->clientId = config('services.trestle.client_id');
+    //     $this->clientSecret = config('services.trestle.client_secret');
+    //     $this->scope = config('services.trestle.scope', 'api');
+    //     $this->grantType = config('services.trestle.grant_type', 'client_credentials');
+    //     $this->tokenUrl = 'https://api-trestle.corelogic.com/trestle/oidc/connect/token';
+    //     $this->apiBaseUrl = 'https://api-trestle.corelogic.com/trestle';
+
+    //     // Check if credentials are set
+    //     if (!$this->clientId || !$this->clientSecret) {
+    //         $this->error('Trestle API credentials are not configured. Please set TRESTLE_CLIENT_ID and TRESTLE_CLIENT_SECRET in your .env file.');
+    //         return 1;
+    //     }
+
+    //     $hours = $this->option('hours');
+    //     $debug = $this->option('debug');
+    //     $geocode = $this->option('geocode');
+
+    //     try {
+    //         // Get authentication token
+    //         $this->accessToken = $this->authenticate();
+    //         if (!$this->accessToken) {
+    //             $this->error('Failed to authenticate with Trestle API.');
+    //             return 1;
+    //         }
+    //         $this->info('Successfully authenticated with Trestle API.');
+
+    //         // Calculate the timestamp for filtering
+    //         // $lookbackTime = Carbon::now()->subHours($hours)->format('Y-m-d\TH:i:s\Z');
+    //         $lookbackTime = Carbon::parse('2024-04-17 00:00:00')->format('Y-m-d\TH:i:s\Z');
+    //         $this->info("Fetching properties modified since: {$lookbackTime}");
+
+    //         // Fetch updated properties
+    //         $updatedProperties = $this->fetchUpdatedProperties($lookbackTime);
+
+    //         if (empty($updatedProperties)) {
+    //             $this->info('No updated properties found.');
+    //             return 0;
+    //         }
+
+    //         $count = count($updatedProperties);
+    //         $this->info("Found {$count} updated properties. Processing...");
+
+    //         // Process synchronously
+    //         $processed = 0;
+    //         $errors = 0;
+    //         $inserted = 0;
+    //         $updated = 0;
+    //         $geocoded = 0;
+
+    //         foreach ($updatedProperties as $propertyData) {
+    //             try {
+    //                 DB::beginTransaction();
+
+    //                 $listingKey = $propertyData['ListingKey'] ?? null;
+
+    //                 if (!$listingKey) {
+    //                     throw new \Exception('Property data missing ListingKey');
+    //                 }
+
+    //                 // Check if property already exists
+    //                 $property = Property::where('ListingKey', $listingKey)->first();
+    //                 $exists = $property !== null;
+
+    //                 // If property doesn't exist, create a new one
+    //                 if (!$exists) {
+    //                     $property = new Property();
+    //                     $inserted++;
+    //                 } else {
+    //                     $updated++;
+    //                 }
+
+    //                 // Map property data to model
+    //                 $this->mapPropertyData($property, $propertyData);
+    //                 $property->updated = ($property->updated ?? 0) + 1;
+
+    //                 // Geocode the property address if option is enabled
+    //                 if ($geocode && $property->UnparsedAddress) {
+    //                     $geocodeData = $this->getGeocodeData($property);
+    //                     if ($geocodeData) {
+    //                         $property->Latitude = $geocodeData['lat'];
+    //                         $property->Longitude = $geocodeData['lng'];
+    //                         $property->Country = $geocodeData['country'];
+    //                         $geocoded++;
+
+    //                         if ($debug) {
+    //                             $this->info("Geocoded address for property: " . $listingKey);
+    //                         }
+    //                     }
+    //                 }
+
+    //                 $property->save();
+
+    //                 // Delete existing related data to avoid duplicates or stale data
+    //                 if ($exists) {
+    //                     $property->details()->delete();
+    //                     $property->amenities()->delete();
+    //                     $property->media()->delete();
+    //                     $property->schools()->delete();
+    //                     $property->financialDetails()->delete();
+    //                 }
+
+    //                 $this->savePropertyDetails($property, $propertyData);
+    //                 $this->savePropertyAmenities($property, $propertyData);
+    //                 $this->savePropertyMedia($property, $propertyData['Media'] ?? []);
+    //                 $this->savePropertySchools($property, $propertyData);
+    //                 $this->savePropertyFinancialDetails($property, $propertyData);
+
+    //                 DB::commit();
+    //                 $processed++;
+
+    //                 if ($debug) {
+    //                     $this->info("Successfully processed property: " . $listingKey);
+    //                 }
+    //             } catch (\Exception $e) {
+    //                 DB::rollBack();
+    //                 $errors++;
+
+    //                 if ($debug) {
+    //                     $this->error('Error processing property: ' . $e->getMessage());
+    //                     $this->error('Property: ' . ($propertyData['ListingKey'] ?? 'unknown'));
+    //                 }
+
+    //                 Log::error('Error processing property: ' . $e->getMessage(), [
+    //                     'property' => $propertyData['ListingKey'] ?? 'unknown',
+    //                     'exception' => $e
+    //                 ]);
+    //             }
+    //         }
+
+    //         $this->info("Verifying processed properties...");
+    //         $verifiedCount = 0;
+    //         $discrepancyCount = 0;
+
+    //         foreach ($updatedProperties as $propertyData) {
+    //             try {
+    //                 $listingKey = $propertyData['ListingKey'] ?? null;
+
+    //                 if (!$listingKey) {
+    //                     continue;
+    //                 }
+
+    //                 // Fetch the property from database
+    //                 $property = Property::where('ListingKey', $listingKey)->first();
+
+    //                 if (!$property) {
+    //                     $this->warn("Property with ListingKey {$listingKey} not found in database after processing.");
+    //                     $discrepancyCount++;
+    //                     continue;
+    //                 }
+
+    //                 // Compare key fields to verify data integrity
+    //                 $discrepancies = $this->verifyPropertyData($property, $propertyData);
+
+    //                 if (empty($discrepancies)) {
+    //                     $verifiedCount++;
+    //                 } else {
+    //                     $discrepancyCount++;
+    //                     if ($debug) {
+    //                         $this->warn("Discrepancies found for property {$listingKey}:");
+    //                         foreach ($discrepancies as $field => $values) {
+    //                             $this->line("  - {$field}: Expected '{$values['expected']}', Got '{$values['actual']}'");
+    //                         }
+    //                     }
+
+    //                     Log::warning("Data discrepancies found for property", [
+    //                         'property' => $listingKey,
+    //                         'discrepancies' => $discrepancies
+    //                     ]);
+    //                 }
+    //             } catch (\Exception $e) {
+    //                 if ($debug) {
+    //                     $this->error("Error verifying property: " . $e->getMessage());
+    //                 }
+    //                 Log::error("Error verifying property: " . $e->getMessage(), [
+    //                     'exception' => $e
+    //                 ]);
+    //             }
+    //         }
+
+    //         $this->info("Verification completed:");
+    //         $this->info("- Properties verified: $verifiedCount");
+    //         $this->info("- Properties with discrepancies: $discrepancyCount");
+
+    //         $this->info("Processing completed:");
+    //         $this->info("- Total processed: $processed");
+    //         $this->info("- Newly inserted: $inserted");
+    //         $this->info("- Updated: $updated");
+    //         $this->info("- Geocoded: $geocoded");
+    //         $this->info("- Errors: $errors");
+
+    //         return 0;
+    //     } catch (\Exception $e) {
+    //         $this->error('An error occurred: ' . $e->getMessage());
+    //         Log::error('Error in UpdateTrestleProperties command: ' . $e->getMessage(), ['exception' => $e]);
+    //         return 1;
+    //     }
+    // }
+
     public function handle()
     {
+        // Increase memory limit if possible
+        ini_set('memory_limit', '1G');
+
         $this->info('Starting Trestle property update process...');
 
         // Load credentials from environment variables
@@ -64,6 +270,7 @@ class UpdateTrestleProperties extends Command
 
         $hours = $this->option('hours');
         $debug = $this->option('debug');
+        $geocode = $this->option('geocode');
 
         try {
             // Get authentication token
@@ -75,148 +282,12 @@ class UpdateTrestleProperties extends Command
             $this->info('Successfully authenticated with Trestle API.');
 
             // Calculate the timestamp for filtering
-            $lookbackTime = Carbon::now()->subHours($hours)->format('Y-m-d\TH:i:s\Z');
+            // $lookbackTime = Carbon::now()->subHours($hours)->format('Y-m-d\TH:i:s\Z');
+            $lookbackTime = Carbon::parse('2024-04-17 00:00:00')->format('Y-m-d\TH:i:s\Z');
             $this->info("Fetching properties modified since: {$lookbackTime}");
 
-            // Fetch updated properties
-            $updatedProperties = $this->fetchUpdatedProperties($lookbackTime);
-
-            if (empty($updatedProperties)) {
-                $this->info('No updated properties found.');
-                return 0;
-            }
-
-            $count = count($updatedProperties);
-            $this->info("Found {$count} updated properties. Processing...");
-
-            // Process synchronously
-            $processed = 0;
-            $errors = 0;
-            $inserted = 0;
-            $updated = 0;
-
-            foreach ($updatedProperties as $propertyData) {
-                try {
-                    DB::beginTransaction();
-
-                    $listingKey = $propertyData['ListingKey'] ?? null;
-
-                    if (!$listingKey) {
-                        throw new \Exception('Property data missing ListingKey');
-                    }
-
-                    // Check if property already exists
-                    $property = Property::where('ListingKey', $listingKey)->first();
-                    $exists = $property !== null;
-
-                    // If property doesn't exist, create a new one
-                    if (!$exists) {
-                        $property = new Property();
-                        $inserted++;
-                    } else {
-                        $updated++;
-                    }
-
-                    // Map property data to model
-                    $this->mapPropertyData($property, $propertyData);
-                    $property->save();
-
-                    // Delete existing related data to avoid duplicates or stale data
-                    if ($exists) {
-                        $property->details()->delete();
-                        $property->amenities()->delete();
-                        $property->media()->delete();
-                        $property->schools()->delete();
-                        $property->financialDetails()->delete();
-                    }
-
-                    $this->savePropertyDetails($property, $propertyData);
-                    $this->savePropertyAmenities($property, $propertyData);
-                    $this->savePropertyMedia($property, $propertyData['Media'] ?? []);
-                    $this->savePropertySchools($property, $propertyData);
-                    $this->savePropertyFinancialDetails($property, $propertyData);
-
-                    DB::commit();
-                    $processed++;
-
-                    if ($debug) {
-                        $this->info("Successfully processed property: " . $listingKey);
-                    }
-                } catch (\Exception $e) {
-                    DB::rollBack();
-                    $errors++;
-
-                    if ($debug) {
-                        $this->error('Error processing property: ' . $e->getMessage());
-                        $this->error('Property: ' . ($propertyData['ListingKey'] ?? 'unknown'));
-                    }
-
-                    Log::error('Error processing property: ' . $e->getMessage(), [
-                        'property' => $propertyData['ListingKey'] ?? 'unknown',
-                        'exception' => $e
-                    ]);
-                }
-            }
-
-            $this->info("Verifying processed properties...");
-            $verifiedCount = 0;
-            $discrepancyCount = 0;
-
-            foreach ($updatedProperties as $propertyData) {
-                try {
-                    $listingKey = $propertyData['ListingKey'] ?? null;
-                    
-                    if (!$listingKey) {
-                        continue;
-                    }
-                    
-                    // Fetch the property from database
-                    $property = Property::where('ListingKey', $listingKey)->first();
-                    
-                    if (!$property) {
-                        $this->warn("Property with ListingKey {$listingKey} not found in database after processing.");
-                        $discrepancyCount++;
-                        continue;
-                    }
-                    
-                    // Compare key fields to verify data integrity
-                    $discrepancies = $this->verifyPropertyData($property, $propertyData);
-                    
-                    if (empty($discrepancies)) {
-                        $verifiedCount++;
-                    } else {
-                        $discrepancyCount++;
-                        if ($debug) {
-                            $this->warn("Discrepancies found for property {$listingKey}:");
-                            foreach ($discrepancies as $field => $values) {
-                                $this->line("  - {$field}: Expected '{$values['expected']}', Got '{$values['actual']}'");
-                            }
-                        }
-                        
-                        Log::warning("Data discrepancies found for property", [
-                            'property' => $listingKey,
-                            'discrepancies' => $discrepancies
-                        ]);
-                    }
-                } catch (\Exception $e) {
-                    if ($debug) {
-                        $this->error("Error verifying property: " . $e->getMessage());
-                    }
-                    Log::error("Error verifying property: " . $e->getMessage(), [
-                        'exception' => $e
-                    ]);
-                }
-            }
-
-            $this->info("Verification completed:");
-            $this->info("- Properties verified: $verifiedCount");
-            $this->info("- Properties with discrepancies: $discrepancyCount");
-
-            $this->info("Processing completed:");
-            $this->info("- Total processed: $processed");
-            $this->info("- Newly inserted: $inserted");
-            $this->info("- Updated: $updated");
-            $this->info("- Errors: $errors");
+            // Process properties in batches
+            $this->processBatches($lookbackTime, $debug, $geocode);
 
             return 0;
         } catch (\Exception $e) {
@@ -226,53 +297,278 @@ class UpdateTrestleProperties extends Command
         }
     }
 
+    /**
+     * Process properties in batches to avoid memory issues
+     */
+    protected function processBatches($timestamp, $debug, $geocode)
+    {
+        $maxRetries = 3;
+        $skip = 0;
+        $batchSize = 200;
+        $morePropertiesAvailable = true;
+        $totalProcessed = 0;
+        $totalInserted = 0;
+        $totalUpdated = 0;
+        $totalGeocoded = 0;
+        $totalErrors = 0;
+        $totalVerified = 0;
+        $totalDiscrepancies = 0;
+
+        while ($morePropertiesAvailable) {
+            try {
+                // Build the OData query
+                $url = $this->apiBaseUrl . '/odata/Property';
+                $query = [
+                    '$top' => $batchSize,
+                    '$skip' => $skip,
+                    '$expand' => 'Media',
+                    '$filter' => "ModificationTimestamp gt {$timestamp}",
+                    '$orderby' => 'ModificationTimestamp asc',
+                    '$count' => 'true'
+                ];
+
+                $response = Http::timeout(120)
+                    ->withToken($this->accessToken)
+                    ->withHeaders([
+                        'Accept' => 'application/json'
+                    ])
+                    ->get($url, $query);
+
+                if (!$response->successful()) {
+                    $this->error('API request failed: ' . $response->status() . ' ' . $response->body());
+                    Log::error('Trestle API request failed', [
+                        'status' => $response->status(),
+                        'body' => $response->body()
+                    ]);
+                    break;
+                }
+
+                $data = $response->json();
+
+                if (!isset($data['value']) || !is_array($data['value'])) {
+                    $this->error('API response does not contain property data.');
+                    Log::error('Trestle API response missing property data', [
+                        'response' => $data
+                    ]);
+                    break;
+                }
+
+                $properties = $data['value'];
+                $fetchedCount = count($properties);
+
+                if ($fetchedCount > 0) {
+                    $skip += $fetchedCount;
+                    $this->info("Fetched {$fetchedCount} properties (total: {$skip})");
+
+                    // Process this batch
+                    $processed = 0;
+                    $errors = 0;
+                    $inserted = 0;
+                    $updated = 0;
+                    $geocoded = 0;
+                    $verifiedCount = 0;
+                    $discrepancyCount = 0;
+
+                    // Process each property in the batch
+                    foreach ($properties as $propertyData) {
+                        try {
+                            DB::beginTransaction();
+
+                            $listingKey = $propertyData['ListingKey'] ?? null;
+
+                            if (!$listingKey) {
+                                throw new \Exception('Property data missing ListingKey');
+                            }
+
+                            // Check if property already exists
+                            $property = Property::where('ListingKey', $listingKey)->first();
+                            $exists = $property !== null;
+
+                            // If property doesn't exist, create a new one
+                            if (!$exists) {
+                                $property = new Property();
+                                $inserted++;
+                            } else {
+                                $updated++;
+                            }
+
+                            // Map property data to model
+                            $this->mapPropertyData($property, $propertyData);
+                            $property->updated = ($property->updated ?? 0) + 1;
+
+                            // Geocode the property address if option is enabled
+                            if ($geocode && $property->UnparsedAddress) {
+                                $geocodeData = $this->getGeocodeData($property);
+                                if ($geocodeData) {
+                                    $property->Latitude = $geocodeData['lat'];
+                                    $property->Longitude = $geocodeData['lng'];
+                                    $property->Country = $geocodeData['country'];
+                                    $geocoded++;
+
+                                    if ($debug) {
+                                        $this->info("Geocoded address for property: " . $listingKey);
+                                    }
+                                }
+                            }
+
+                            $property->save();
+
+                            // Delete existing related data to avoid duplicates or stale data
+                            if ($exists) {
+                                $property->details()->delete();
+                                $property->amenities()->delete();
+                                $property->media()->delete();
+                                $property->schools()->delete();
+                                $property->financialDetails()->delete();
+                            }
+
+                            $this->savePropertyDetails($property, $propertyData);
+                            $this->savePropertyAmenities($property, $propertyData);
+                            $this->savePropertyMedia($property, $propertyData['Media'] ?? []);
+                            $this->savePropertySchools($property, $propertyData);
+                            $this->savePropertyFinancialDetails($property, $propertyData);
+
+                            DB::commit();
+                            $processed++;
+
+                            if ($debug) {
+                                $this->info("Successfully processed property: " . $listingKey);
+                            }
+
+                            // Verify the property data
+                            $discrepancies = $this->verifyPropertyData($property, $propertyData);
+
+                            if (empty($discrepancies)) {
+                                $verifiedCount++;
+                            } else {
+                                $discrepancyCount++;
+                                if ($debug) {
+                                    $this->warn("Discrepancies found for property {$listingKey}:");
+                                    foreach ($discrepancies as $field => $values) {
+                                        $this->line("  - {$field}: Expected '{$values['expected']}', Got '{$values['actual']}'");
+                                    }
+                                }
+
+                                Log::warning("Data discrepancies found for property", [
+                                    'property' => $listingKey,
+                                    'discrepancies' => $discrepancies
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            DB::rollBack();
+                            $errors++;
+
+                            if ($debug) {
+                                $this->error('Error processing property: ' . $e->getMessage());
+                                $this->error('Property: ' . ($propertyData['ListingKey'] ?? 'unknown'));
+                            }
+
+                            Log::error('Error processing property: ' . $e->getMessage(), [
+                                'property' => $propertyData['ListingKey'] ?? 'unknown',
+                                'exception' => $e
+                            ]);
+                        }
+                    }
+
+                    // Update totals
+                    $totalProcessed += $processed;
+                    $totalInserted += $inserted;
+                    $totalUpdated += $updated;
+                    $totalGeocoded += $geocoded;
+                    $totalErrors += $errors;
+                    $totalVerified += $verifiedCount;
+                    $totalDiscrepancies += $discrepancyCount;
+
+                    $this->info("Batch processing completed:");
+                    $this->info("- Processed: $processed");
+                    $this->info("- Inserted: $inserted");
+                    $this->info("- Updated: $updated");
+                    $this->info("- Geocoded: $geocoded");
+                    $this->info("- Verified: $verifiedCount");
+                    $this->info("- Discrepancies: $discrepancyCount");
+                    $this->info("- Errors: $errors");
+
+                    // Free up memory
+                    unset($properties);
+                    unset($data);
+                    gc_collect_cycles();
+                }
+
+                // If we got fewer properties than requested, we've reached the end
+                if ($fetchedCount < $batchSize) {
+                    $morePropertiesAvailable = false;
+                }
+
+                // Small delay between requests
+                if ($morePropertiesAvailable) {
+                    sleep(1);
+                }
+            } catch (\Exception $e) {
+                $this->error('Exception fetching properties: ' . $e->getMessage());
+                Log::error('Exception fetching properties from Trestle API', [
+                    'exception' => $e->getMessage()
+                ]);
+                break;
+            }
+        }
+
+        $this->info("Overall processing completed:");
+        $this->info("- Total processed: $totalProcessed");
+        $this->info("- Newly inserted: $totalInserted");
+        $this->info("- Updated: $totalUpdated");
+        $this->info("- Geocoded: $totalGeocoded");
+        $this->info("- Verified: $totalVerified");
+        $this->info("- Discrepancies: $totalDiscrepancies");
+        $this->info("- Errors: $totalErrors");
+    }
+
 
     protected function verifyPropertyData(Property $property, array $expectedData)
-{
-    $discrepancies = [];
-    
-    // List of important fields to verify
-    $fieldsToVerify = [
-        'ListingId', 'ListPrice', 'StandardStatus', 'BedroomsTotal', 
-        'BathroomsTotalInteger', 'LivingArea', 'YearBuilt', 'PostalCode'
-    ];
-    
-    foreach ($fieldsToVerify as $field) {
-        if (isset($expectedData[$field]) && $property->$field != $expectedData[$field]) {
-            $discrepancies[$field] = [
-                'expected' => $expectedData[$field],
-                'actual' => $property->$field
-            ];
-        }
-    }
-    
-    // Verify related data if needed
-    if (!empty($expectedData['Media']) && $property->media()->count() != count($expectedData['Media'])) {
-        $discrepancies['MediaCount'] = [
-            'expected' => count($expectedData['Media']),
-            'actual' => $property->media()->count()
+    {
+        $discrepancies = [];
+
+        // List of important fields to verify
+        $fieldsToVerify = [
+            'ListingId', 'ListPrice', 'StandardStatus', 'BedroomsTotal',
+            'BathroomsTotalInteger', 'LivingArea', 'YearBuilt', 'PostalCode'
         ];
-    }
-    
-    // Verify property details
-    $details = $property->details;
-    if ($details) {
-        $detailsFieldsToVerify = [
-            'BuildingAreaTotal', 'StructureType', 'PropertyCondition'
-        ];
-        
-        foreach ($detailsFieldsToVerify as $field) {
-            if (isset($expectedData[$field]) && $details->$field != $expectedData[$field]) {
-                $discrepancies["details.{$field}"] = [
+
+        foreach ($fieldsToVerify as $field) {
+            if (isset($expectedData[$field]) && $property->$field != $expectedData[$field]) {
+                $discrepancies[$field] = [
                     'expected' => $expectedData[$field],
-                    'actual' => $details->$field
+                    'actual' => $property->$field
                 ];
             }
         }
+
+        // Verify related data if needed
+        if (!empty($expectedData['Media']) && $property->media()->count() != count($expectedData['Media'])) {
+            $discrepancies['MediaCount'] = [
+                'expected' => count($expectedData['Media']),
+                'actual' => $property->media()->count()
+            ];
+        }
+
+        // Verify property details
+        $details = $property->details;
+        if ($details) {
+            $detailsFieldsToVerify = [
+                'BuildingAreaTotal', 'StructureType', 'PropertyCondition'
+            ];
+
+            foreach ($detailsFieldsToVerify as $field) {
+                if (isset($expectedData[$field]) && $details->$field != $expectedData[$field]) {
+                    $discrepancies["details.{$field}"] = [
+                        'expected' => $expectedData[$field],
+                        'actual' => $details->$field
+                    ];
+                }
+            }
+        }
+
+        return $discrepancies;
     }
-    
-    return $discrepancies;
-}
 
     /**
      * Authenticate with Trestle API and get access token
@@ -326,91 +622,302 @@ class UpdateTrestleProperties extends Command
      * @param string $timestamp ISO 8601 timestamp
      * @return array Array of property data
      */
-    protected function fetchUpdatedProperties($timestamp)
-    {
-        $this->info("Fetching properties updated since {$timestamp}...");
-        $maxRetries = 3;
-        $retryCount = 0;
-        $allProperties = [];
-        $skip = 0;
-        $batchSize = 200;
-        $morePropertiesAvailable = true;
+    // protected function fetchUpdatedProperties($timestamp)
+    // {
+    //     $this->info("Fetching properties updated since {$timestamp}...");
+    //     $maxRetries = 3;
+    //     $retryCount = 0;
+    //     $allProperties = [];
+    //     $skip = 0;
+    //     $batchSize = 200;
+    //     $morePropertiesAvailable = true;
 
-        while ($morePropertiesAvailable && $retryCount <= $maxRetries) {
-            try {
-                // Build the OData query
-                $url = $this->apiBaseUrl . '/odata/Property';
-                $query = [
-                    '$top' => $batchSize,
-                    '$skip' => $skip,
-                    '$expand' => 'Media',
-                    '$filter' => "ModificationTimestamp gt {$timestamp}",
-                    '$orderby' => 'ModificationTimestamp asc',
-                    '$count' => 'true'
-                ];
+    //     while ($morePropertiesAvailable && $retryCount <= $maxRetries) {
+    //         try {
+    //             // Build the OData query
+    //             $url = $this->apiBaseUrl . '/odata/Property';
+    //             $query = [
+    //                 '$top' => $batchSize,
+    //                 '$skip' => $skip,
+    //                 '$expand' => 'Media',
+    //                 '$filter' => "ModificationTimestamp gt {$timestamp}",
+    //                 '$orderby' => 'ModificationTimestamp asc',
+    //                 '$count' => 'true'
+    //             ];
 
-                $response = Http::timeout(120)
-                    ->withToken($this->accessToken)
-                    ->withHeaders([
-                        'Accept' => 'application/json'
-                    ])
-                    ->get($url, $query);
+    //             $response = Http::timeout(120)
+    //                 ->withToken($this->accessToken)
+    //                 ->withHeaders([
+    //                     'Accept' => 'application/json'
+    //                 ])
+    //                 ->get($url, $query);
 
-                if (!$response->successful()) {
-                    $this->error('API request failed: ' . $response->status() . ' ' . $response->body());
-                    Log::error('Trestle API request failed', [
-                        'status' => $response->status(),
-                        'body' => $response->body()
-                    ]);
-                    return [];
-                }
+    //             if (!$response->successful()) {
+    //                 $this->error('API request failed: ' . $response->status() . ' ' . $response->body());
+    //                 Log::error('Trestle API request failed', [
+    //                     'status' => $response->status(),
+    //                     'body' => $response->body()
+    //                 ]);
+    //                 return [];
+    //             }
 
-                $data = $response->json();
+    //             $data = $response->json();
 
-                if (!isset($data['value']) || !is_array($data['value'])) {
-                    $this->error('API response does not contain property data.');
-                    Log::error('Trestle API response missing property data', [
-                        'response' => $data
-                    ]);
-                    return [];
-                }
+    //             if (!isset($data['value']) || !is_array($data['value'])) {
+    //                 $this->error('API response does not contain property data.');
+    //                 Log::error('Trestle API response missing property data', [
+    //                     'response' => $data
+    //                 ]);
+    //                 return [];
+    //             }
 
-                $properties = $data['value'];
-                $fetchedCount = count($properties);
+    //             $properties = $data['value'];
+    //             $fetchedCount = count($properties);
 
-                if ($fetchedCount > 0) {
-                    $allProperties = array_merge($allProperties, $properties);
-                    $skip += $fetchedCount;
-                    $this->info("Fetched {$fetchedCount} properties (total: " . count($allProperties) . ")");
-                }
+    //             if ($fetchedCount > 0) {
+    //                 $allProperties = array_merge($allProperties, $properties);
+    //                 $skip += $fetchedCount;
+    //                 $this->info("Fetched {$fetchedCount} properties (total: " . count($allProperties) . ")");
+    //             }
 
-                // If we got fewer properties than requested, we've reached the end
-                if ($fetchedCount < $batchSize) {
-                    $morePropertiesAvailable = false;
-                }
+    //             // If we got fewer properties than requested, we've reached the end
+    //             if ($fetchedCount < $batchSize) {
+    //                 $morePropertiesAvailable = false;
+    //             }
 
-                // Small delay between requests
-                if ($morePropertiesAvailable) {
-                    sleep(1);
-                }
-            } catch (\Exception $e) {
-                $retryCount++;
+    //             // Small delay between requests
+    //             if ($morePropertiesAvailable) {
+    //                 sleep(1);
+    //             }
+    //         } catch (\Exception $e) {
+    //             $retryCount++;
 
-                if ($retryCount > $maxRetries) {
-                    $this->error('Exception fetching properties: ' . $e->getMessage());
-                    Log::error('Exception fetching properties from Trestle API', [
-                        'exception' => $e->getMessage()
-                    ]);
-                    break;
-                }
+    //             if ($retryCount > $maxRetries) {
+    //                 $this->error('Exception fetching properties: ' . $e->getMessage());
+    //                 Log::error('Exception fetching properties from Trestle API', [
+    //                     'exception' => $e->getMessage()
+    //                 ]);
+    //                 break;
+    //             }
 
-                $this->warn("Request failed, retrying ({$retryCount}/{$maxRetries})...");
-                sleep(5); // Wait 5 seconds before retrying
-            }
-        }
+    //             $this->warn("Request failed, retrying ({$retryCount}/{$maxRetries})...");
+    //             sleep(5); // Wait 5 seconds before retrying
+    //         }
+    //     }
 
-        return $allProperties;
-    }
+    //     return $allProperties;
+    // }
+
+
+    // protected function fetchUpdatedProperties($timestamp)
+    // {
+    //     $this->info("Fetching properties updated since {$timestamp}...");
+    //     $maxRetries = 3;
+    //     $skip = 0;
+    //     $batchSize = 200;
+    //     $morePropertiesAvailable = true;
+    //     $totalProcessed = 0;
+    //     $totalInserted = 0;
+    //     $totalUpdated = 0;
+    //     $totalGeocoded = 0;
+    //     $totalErrors = 0;
+    //     $debug = $this->option('debug');
+    //     $geocode = $this->option('geocode');
+
+    //     while ($morePropertiesAvailable) {
+    //         try {
+    //             // Build the OData query
+    //             $url = $this->apiBaseUrl . '/odata/Property';
+    //             $query = [
+    //                 '$top' => $batchSize,
+    //                 '$skip' => $skip,
+    //                 '$expand' => 'Media',
+    //                 '$filter' => "ModificationTimestamp gt {$timestamp}",
+    //                 '$orderby' => 'ModificationTimestamp asc',
+    //                 '$count' => 'true'
+    //             ];
+
+    //             $response = Http::timeout(120)
+    //                 ->withToken($this->accessToken)
+    //                 ->withHeaders([
+    //                     'Accept' => 'application/json'
+    //                 ])
+    //                 ->get($url, $query);
+
+    //             if (!$response->successful()) {
+    //                 $this->error('API request failed: ' . $response->status() . ' ' . $response->body());
+    //                 Log::error('Trestle API request failed', [
+    //                     'status' => $response->status(),
+    //                     'body' => $response->body()
+    //                 ]);
+    //                 break;
+    //             }
+
+    //             $data = $response->json();
+
+    //             if (!isset($data['value']) || !is_array($data['value'])) {
+    //                 $this->error('API response does not contain property data.');
+    //                 Log::error('Trestle API response missing property data', [
+    //                     'response' => $data
+    //                 ]);
+    //                 break;
+    //             }
+
+    //             $properties = $data['value'];
+    //             $fetchedCount = count($properties);
+
+    //             if ($fetchedCount > 0) {
+    //                 $skip += $fetchedCount;
+    //                 $this->info("Fetched {$fetchedCount} properties (total: {$skip})");
+
+    //                 // Process this batch immediately
+    //                 $batchResults = $this->processPropertyBatch($properties, $debug, $geocode);
+    //                 $totalProcessed += $batchResults['processed'];
+    //                 $totalInserted += $batchResults['inserted'];
+    //                 $totalUpdated += $batchResults['updated'];
+    //                 $totalGeocoded += $batchResults['geocoded'];
+    //                 $totalErrors += $batchResults['errors'];
+
+    //                 // Free up memory
+    //                 unset($properties);
+    //                 unset($data);
+    //                 gc_collect_cycles();
+    //             }
+
+    //             // If we got fewer properties than requested, we've reached the end
+    //             if ($fetchedCount < $batchSize) {
+    //                 $morePropertiesAvailable = false;
+    //             }
+
+    //             // Small delay between requests
+    //             if ($morePropertiesAvailable) {
+    //                 sleep(1);
+    //             }
+    //         } catch (\Exception $e) {
+    //             $this->error('Exception fetching properties: ' . $e->getMessage());
+    //             Log::error('Exception fetching properties from Trestle API', [
+    //                 'exception' => $e->getMessage()
+    //             ]);
+    //             break;
+    //         }
+    //     }
+
+    //     $this->info("Processing completed:");
+    //     $this->info("- Total processed: $totalProcessed");
+    //     $this->info("- Newly inserted: $totalInserted");
+    //     $this->info("- Updated: $totalUpdated");
+    //     $this->info("- Geocoded: $totalGeocoded");
+    //     $this->info("- Errors: $totalErrors");
+
+    //     return true;
+    // }
+
+    // Add this new method to process each batch
+    // protected function processPropertyBatch($properties, $debug, $geocode)
+    // {
+    //     $processed = 0;
+    //     $errors = 0;
+    //     $inserted = 0;
+    //     $updated = 0;
+    //     $geocoded = 0;
+
+    //     foreach ($properties as $propertyData) {
+    //         try {
+    //             DB::beginTransaction();
+
+    //             $listingKey = $propertyData['ListingKey'] ?? null;
+
+    //             if (!$listingKey) {
+    //                 throw new \Exception('Property data missing ListingKey');
+    //             }
+
+    //             // Check if property already exists
+    //             $property = Property::where('ListingKey', $listingKey)->first();
+    //             $exists = $property !== null;
+
+    //             // If property doesn't exist, create a new one
+    //             if (!$exists) {
+    //                 $property = new Property();
+    //                 $inserted++;
+    //             } else {
+    //                 $updated++;
+    //             }
+
+    //             // Map property data to model
+    //             $this->mapPropertyData($property, $propertyData);
+
+    //             // Increment the updated counter for the property
+    //             $property->updated = ($property->updated ?? 0) + 1;
+
+    //             // Geocode the property address if option is enabled
+    //             if ($geocode && $property->UnparsedAddress) {
+    //                 $geocodeData = $this->getGeocodeData($property);
+    //                 if ($geocodeData) {
+    //                     $property->Latitude = $geocodeData['lat'];
+    //                     $property->Longitude = $geocodeData['lng'];
+    //                     $property->Country = $geocodeData['country'];
+    //                     $geocoded++;
+
+    //                     if ($debug) {
+    //                         $this->info("Geocoded address for property: " . $listingKey);
+    //                     }
+    //                 }
+    //             }
+
+    //             $property->save();
+
+    //             // Delete existing related data to avoid duplicates or stale data
+    //             if ($exists) {
+    //                 $property->details()->delete();
+    //                 $property->amenities()->delete();
+    //                 $property->media()->delete();
+    //                 $property->schools()->delete();
+    //                 $property->financialDetails()->delete();
+    //             }
+
+    //             $this->savePropertyDetails($property, $propertyData);
+    //             $this->savePropertyAmenities($property, $propertyData);
+    //             $this->savePropertyMedia($property, $propertyData['Media'] ?? []);
+    //             $this->savePropertySchools($property, $propertyData);
+    //             $this->savePropertyFinancialDetails($property, $propertyData);
+
+    //             DB::commit();
+    //             $processed++;
+
+    //             if ($debug) {
+    //                 $this->info("Successfully processed property: " . $listingKey);
+    //             }
+    //         } catch (\Exception $e) {
+    //             DB::rollBack();
+    //             $errors++;
+
+    //             if ($debug) {
+    //                 $this->error('Error processing property: ' . $e->getMessage());
+    //                 $this->error('Property: ' . ($propertyData['ListingKey'] ?? 'unknown'));
+    //             }
+
+    //             Log::error('Error processing property: ' . $e->getMessage(), [
+    //                 'property' => $propertyData['ListingKey'] ?? 'unknown',
+    //                 'exception' => $e
+    //             ]);
+    //         }
+    //     }
+
+    //     $this->info("Batch processing completed:");
+    //     $this->info("- Processed: $processed");
+    //     $this->info("- Inserted: $inserted");
+    //     $this->info("- Updated: $updated");
+    //     $this->info("- Geocoded: $geocoded");
+    //     $this->info("- Errors: $errors");
+
+    //     return [
+    //         'processed' => $processed,
+    //         'inserted' => $inserted,
+    //         'updated' => $updated,
+    //         'geocoded' => $geocoded,
+    //         'errors' => $errors
+    //     ];
+    // }
 
     /**
      * Map property data to the Property model
@@ -501,7 +1008,6 @@ class UpdateTrestleProperties extends Command
         if (isset($data['SourceSystemKey'])) $property->SourceSystemKey = $data['SourceSystemKey'];
         if (isset($data['ListingService'])) $property->ListingService = $data['ListingService'];
     }
-
 
     /**
      * Save property details to the property_details table
@@ -728,5 +1234,45 @@ class UpdateTrestleProperties extends Command
         ];
 
         return $mimeTypes[strtolower($extension)] ?? 'application/octet-stream';
+    }
+
+    /**
+     * Get geocode data for a property
+     * 
+     * @param Property $property The property model
+     * @return array|null Geocode data with lat, lng, and country
+     */
+    protected function getGeocodeData($property)
+    {
+        if (!$property->UnparsedAddress) {
+            return null;
+        }
+
+        $address = urlencode($property->UnparsedAddress);
+        $url = "https://api.mapbox.com/geocoding/v5/mapbox.places/{$address}.json?access_token=pk.eyJ1IjoiamFzcC1yZWV0IiwiYSI6ImNtOWxiaXluczAyeHUybHIxc2sycHVsNjQifQ.NW350JyVU-z-cMkzgdCrNw";
+
+        $response = Http::withOptions(['verify' => false])->get($url);
+
+        $data = $response->json();
+
+        if (!isset($data['features'][0])) {
+            return null;
+        }
+
+        $location = $data['features'][0]['geometry']['coordinates'];
+        $country = null;
+
+        foreach ($data['features'][0]['context'] ?? [] as $component) {
+            if (strpos($component['id'], 'country') !== false) {
+                $country = $component['text'];
+                break;
+            }
+        }
+
+        return [
+            'lat' => $location[1],
+            'lng' => $location[0],
+            'country' => $country,
+        ];
     }
 }
