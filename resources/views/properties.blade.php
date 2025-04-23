@@ -254,7 +254,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Replace with your Mapbox access token
-            const mapboxToken = '{{ env('MAPBOX_ACCESS_TOKEN') }}';
+            const mapboxToken = 'pk.eyJ1IjoiamFzcC1yZWV0IiwiYSI6ImNtOWxiaXluczAyeHUybHIxc2sycHVsNjQifQ.NW350JyVU-z-cMkzgdCrNw';
             
             if (!mapboxToken) {
                 console.error('Mapbox access token is not set');
