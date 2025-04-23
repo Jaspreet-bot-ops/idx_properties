@@ -66,119 +66,230 @@ class PropertyController extends Controller
     /**
      * Convert state name to abbreviation if possible
      */
-    private function getStateAbbreviation($stateName)
+    protected function getStateAbbreviation($state)
     {
-        $stateLower = strtolower(trim($stateName));
-        
-        // If it's already an abbreviation (2 characters), return as is
-        if (strlen($stateLower) == 2) {
-            return strtoupper($stateLower);
-        }
-        
-        // Check if it's in our map
-        if (isset($this->stateMap[$stateLower])) {
-            return $this->stateMap[$stateLower];
-        }
-        
-        // If not found, return original
-        return $stateName;
+        $states = [
+            'Alabama' => 'AL', 'Alaska' => 'AK', 'Arizona' => 'AZ', 'Arkansas' => 'AR',
+            'California' => 'CA', 'Colorado' => 'CO', 'Connecticut' => 'CT', 'Delaware' => 'DE',
+            'Florida' => 'FL', 'Georgia' => 'GA', 'Hawaii' => 'HI', 'Idaho' => 'ID',
+            'Illinois' => 'IL', 'Indiana' => 'IN', 'Iowa' => 'IA', 'Kansas' => 'KS',
+            'Kentucky' => 'KY', 'Louisiana' => 'LA', 'Maine' => 'ME', 'Maryland' => 'MD',
+            'Massachusetts' => 'MA', 'Michigan' => 'MI', 'Minnesota' => 'MN', 'Mississippi' => 'MS',
+            'Missouri' => 'MO', 'Montana' => 'MT', 'Nebraska' => 'NE', 'Nevada' => 'NV',
+            'New Hampshire' => 'NH', 'New Jersey' => 'NJ', 'New Mexico' => 'NM', 'New York' => 'NY',
+            'North Carolina' => 'NC', 'North Dakota' => 'ND', 'Ohio' => 'OH', 'Oklahoma' => 'OK',
+            'Oregon' => 'OR', 'Pennsylvania' => 'PA', 'Rhode Island' => 'RI', 'South Carolina' => 'SC',
+            'South Dakota' => 'SD', 'Tennessee' => 'TN', 'Texas' => 'TX', 'Utah' => 'UT',
+            'Vermont' => 'VT', 'Virginia' => 'VA', 'Washington' => 'WA', 'West Virginia' => 'WV',
+            'Wisconsin' => 'WI', 'Wyoming' => 'WY',
+        ];
+
+        $state = trim($state);
+        return $states[$state] ?? $state;
     }
 
     /**
      * Display a listing of the resource.
      */
+    // public function index(Request $request)
+    // {
+    //     $query = Property::query();
+
+    //     // Search functionality
+    //     if ($request->has('search') && !empty($request->search)) {
+    //         $searchTerm = $request->search;
+
+    //         // Check if the search term contains commas (like "City, State, Country")
+    //         if (strpos($searchTerm, ',') !== false) {
+    //             $parts = array_map('trim', explode(',', $searchTerm));
+
+    //             // Extract city, state, and country
+    //             $city = isset($parts[0]) ? $parts[0] : null;
+    //             $state = isset($parts[1]) ? $parts[1] : null;
+    //             $country = isset($parts[2]) ? $parts[2] : null;
+
+    //             // Convert state name to abbreviation if needed
+    //             $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
+
+    //             // Build a more precise query with AND conditions between parts
+    //             $query->where(function($q) use ($city, $stateAbbr, $country) {
+    //                 // Start with the city - this is required
+
+
+    //                 if ($city) {
+    //                     $q->where('City', 'like', "{$city}%");
+    //                 }
+
+    //                 // Add state condition if provided
+    //                 if ($stateAbbr) {
+    //                     $q->where('StateOrProvince', 'like', "{$stateAbbr}%");
+    //                 }
+
+    //                 // Add country condition if provided
+    //                 if ($country) {
+    //                     $q->where('country', 'like', "%{$country}%");
+    //                 }
+    //             });
+    //         } else {
+    //             // For single term searches, try to match exactly on common fields
+    //             $query->where(function($q) use ($searchTerm) {
+    //                 $q->where('City', $searchTerm)
+    //                   ->orWhere('PostalCode', $searchTerm)
+    //                   ->orWhere('UnparsedAddress', 'like', "%{$searchTerm}%")
+    //                   ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$searchTerm}%");
+
+    //                 // Check if it might be a state
+    //                 $stateAbbr = $this->getStateAbbreviation($searchTerm);
+    //                 if ($stateAbbr !== $searchTerm) {
+    //                     $q->orWhere('StateOrProvince', $stateAbbr);
+    //                 } else {
+    //                     $q->orWhere('StateOrProvince', $searchTerm);
+    //                 }
+    //             });
+    //         }
+    //     }
+
+    //     // Filter by specific address components if needed
+    //     if ($request->has('street_number') && !empty($request->street_number)) {
+    //         $query->where('StreetNumber', 'like', "%{$request->street_number}%");
+    //     }
+
+    //     if ($request->has('street_name') && !empty($request->street_name)) {
+    //         $query->where('StreetName', 'like', "%{$request->street_name}%");
+    //     }
+
+    //     if ($request->has('postal_code') && !empty($request->postal_code)) {
+    //         $query->where('PostalCode', 'like', "%{$request->postal_code}%");
+    //     }
+
+    //     if ($request->has('city') && !empty($request->city)) {
+    //         $query->where('City', 'like', "%{$request->city}%");
+    //     }
+
+    //     if ($request->has('country') && !empty($request->country)) {
+    //         $query->where('country', 'like', "%{$request->country}%");
+    //     }
+
+    //     $properties = $query->paginate(10);
+
+    //     // If this is an AJAX request, return JSON
+    //     if ($request->ajax()) {
+    //         return response()->json([
+    //             'html' => view('partials.properties-table', compact('properties'))->render(),
+    //             'pagination' => view('partials.pagination', compact('properties'))->render(),
+    //         ]);
+    //     }
+
+    //     return view('properties', compact('properties'));
+    // }
+
     public function index(Request $request)
     {
         $query = Property::query();
-        
+
         // Search functionality
         if ($request->has('search') && !empty($request->search)) {
-            $searchTerm = $request->search;
-            
-            // Check if the search term contains commas (like "City, State, Country")
-            if (strpos($searchTerm, ',') !== false) {
-                $parts = array_map('trim', explode(',', $searchTerm));
-                
-                // Extract city, state, and country
-                $address = isset($parts[0]) ? $parts[0] : null;
-                $city = isset($parts[1]) ? $parts[1] : null;
-                $state = isset($parts[2]) ? $parts[2] : null;
-                $country = isset($parts[3]) ? $parts[3] : null;
-                
-                // Convert state name to abbreviation if needed
-                $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
-                
-                // Build a more precise query with AND conditions between parts
-                $query->where(function($q) use ($address, $city, $stateAbbr, $country) {
-                    // Start with the city - this is required
-                    if ($address) {
-                        $q->where('UnparsedAddress', 'like', "{$address}%");
-                    }
+            $searchTerm = trim($request->search);
 
-                    if ($city) {
-                        $q->where('City', 'like', "{$city}%");
-                    }
-                    
-                    // Add state condition if provided
-                    if ($stateAbbr) {
-                        $q->where('StateOrProvince', 'like', "{$stateAbbr}%");
-                    }
-                    
-                    // Add country condition if provided
-                    if ($country) {
-                        $q->where('country', 'like', "%{$country}%");
-                    }
-                });
-            } else {
-                // For single term searches, try to match exactly on common fields
-                $query->where(function($q) use ($searchTerm) {
-                    $q->where('City', $searchTerm)
-                      ->orWhere('PostalCode', $searchTerm)
-                      ->orWhere('UnparsedAddress', 'like', "%{$searchTerm}%")
-                      ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$searchTerm}%");
-                      
-                    // Check if it might be a state
-                    $stateAbbr = $this->getStateAbbreviation($searchTerm);
-                    if ($stateAbbr !== $searchTerm) {
-                        $q->orWhere('StateOrProvince', $stateAbbr);
-                    } else {
-                        $q->orWhere('StateOrProvince', $searchTerm);
-                    }
-                });
+            $parts = array_map('trim', explode(',', $searchTerm));
+            $partsCount = count($parts);
+
+            $street = null;
+            $city = null;
+            $state = null;
+            $postalCode = null;
+            $country = null;
+
+            // Handle different address input patterns
+            if ($partsCount >= 1) {
+                $streetOrCity = $parts[0];
+
+                // If it's a full address, like "400 Sunny Isles Blvd 119"
+                if (preg_match('/\d+/', $streetOrCity)) {
+                    $street = $streetOrCity;
+                } else {
+                    $city = $streetOrCity;
+                }
             }
+
+            if ($partsCount >= 2) {
+                $city = $parts[1];
+            }
+
+            if ($partsCount >= 3) {
+                $state = $parts[2];
+            }
+
+            if ($partsCount >= 4) {
+                // Either a postal code or a country
+                if (preg_match('/\d{4,}/', $parts[3])) {
+                    $postalCode = $parts[3];
+                } else {
+                    $country = $parts[3];
+                }
+            }
+
+            if ($partsCount >= 5) {
+                $country = $parts[4];
+            }
+
+            // Convert full state to abbreviation if needed
+            $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
+
+            $query->where(function ($q) use ($street, $city, $stateAbbr, $postalCode, $country) {
+                if ($street) {
+                    $q->where(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$street}%")
+                        ->orWhere('UnparsedAddress', 'like', "%{$street}%");
+                }
+
+                if ($city) {
+                    $q->where('City', 'like', "%{$city}%");
+                }
+
+                if ($stateAbbr) {
+                    $q->where('StateOrProvince', 'like', "{$stateAbbr}%");
+                }
+
+                if ($postalCode) {
+                    $q->where('PostalCode', 'like', "%{$postalCode}%");
+                }
+
+                if ($country) {
+                    $q->where('country', 'like', "%{$country}%");
+                }
+            });
         }
-        
-        // Filter by specific address components if needed
-        if ($request->has('street_number') && !empty($request->street_number)) {
+
+        // Individual filters (optional)
+        if ($request->filled('street_number')) {
             $query->where('StreetNumber', 'like', "%{$request->street_number}%");
         }
-        
-        if ($request->has('street_name') && !empty($request->street_name)) {
+
+        if ($request->filled('street_name')) {
             $query->where('StreetName', 'like', "%{$request->street_name}%");
         }
-        
-        if ($request->has('postal_code') && !empty($request->postal_code)) {
+
+        if ($request->filled('postal_code')) {
             $query->where('PostalCode', 'like', "%{$request->postal_code}%");
         }
-        
-        if ($request->has('city') && !empty($request->city)) {
+
+        if ($request->filled('city')) {
             $query->where('City', 'like', "%{$request->city}%");
         }
-        
-        if ($request->has('country') && !empty($request->country)) {
+
+        if ($request->filled('country')) {
             $query->where('country', 'like', "%{$request->country}%");
         }
-        
+
         $properties = $query->paginate(10);
-        
-        // If this is an AJAX request, return JSON
+
         if ($request->ajax()) {
             return response()->json([
                 'html' => view('partials.properties-table', compact('properties'))->render(),
                 'pagination' => view('partials.pagination', compact('properties'))->render(),
             ]);
         }
-        
+
         return view('properties', compact('properties'));
     }
 
@@ -219,7 +330,7 @@ class PropertyController extends Controller
             'schools',
             'financialDetails',
         ]);
-    
+
         return view('properties-show', compact('property'));
     }
 
