@@ -67,7 +67,7 @@
         </div>
 
         <div class="bg-white p-6 rounded shadow">
-            <p><strong>Listing Key000000000:</strong> {{ $property->ListingKey }}</p>
+            <p><strong>Listing Key:</strong> {{ $property->ListingKey }}</p>
             <p><strong>Type:</strong> {{ $property->PropertyType }}</p>
             <p><strong>Price:</strong> ${{ number_format($property->ListPrice, 2) }}</p>
             <p><strong>Beds:</strong> {{ $property->BedroomsTotal }}</p>

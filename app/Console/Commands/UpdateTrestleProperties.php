@@ -283,7 +283,7 @@ class UpdateTrestleProperties extends Command
 
             // Calculate the timestamp for filtering
             // $lookbackTime = Carbon::now()->subHours($hours)->format('Y-m-d\TH:i:s\Z');
-            $lookbackTime = Carbon::parse('2024-04-17 00:00:00')->format('Y-m-d\TH:i:s\Z');
+            $lookbackTime = Carbon::parse('2025-04-17 00:00:00')->format('Y-m-d\TH:i:s\Z');
             $this->info("Fetching properties modified since: {$lookbackTime}");
 
             // Process properties in batches

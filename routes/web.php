@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\PropertySuggestionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PropertyController;
 use Illuminate\Support\Facades\Route;
@@ -22,5 +23,7 @@ Route::middleware('auth')->group(function () {
 Route::get('/properties/search-by-address', [PropertyController::class, 'searchByAddress'])->name('properties.search-by-address');
 
 });
+
+Route::get('/property-suggestions', [PropertySuggestionController::class, 'index']);
 
 require __DIR__.'/auth.php';
