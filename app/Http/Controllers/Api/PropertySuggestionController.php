@@ -101,7 +101,7 @@ class PropertySuggestionController extends Controller
                 'city' => $property->City,
                 'state' => $property->StateOrProvince,
                 'postal_code' => $property->PostalCode,
-                'full_address' => "{$property->UnparsedAddress}, {$property->City}, {$property->StateOrProvince} {$property->PostalCode}",
+                'full_address' => "{$property->UnparsedAddress}, {$property->City}, {$property->StateOrProvince}",
                 'property_type' => $property->PropertyType,
                 'status' => $property->StandardStatus,
                 'price' => $property->ListPrice
