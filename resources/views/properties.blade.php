@@ -151,64 +151,64 @@
                             
                             if (data.features && data.features.length > 0) {
                                 // Create a heading for Mapbox results
-                                const heading = document.createElement('div');
-                                heading.className = 'p-2 bg-gray-100 font-semibold text-sm';
-                                heading.textContent = 'Location Suggestions';
-                                resultsContainer.appendChild(heading);
+                                // const heading = document.createElement('div');
+                                // heading.className = 'p-2 bg-gray-100 font-semibold text-sm';
+                                // heading.textContent = 'Location Suggestions';
+                                // resultsContainer.appendChild(heading);
                                 
-                                data.features.forEach(feature => {
-                                    // Extract components from the place name
-                                    const components = feature.place_name.split(', ');
+                                // data.features.forEach(feature => {
+                                //     // Extract components from the place name
+                                //     const components = feature.place_name.split(', ');
                                     
-                                    const item = document.createElement('div');
-                                    item.className = 'p-2 hover:bg-gray-100 cursor-pointer';
+                                //     const item = document.createElement('div');
+                                //     item.className = 'p-2 hover:bg-gray-100 cursor-pointer';
                                     
-                                    // Format the display to highlight the main part
-                                    if (components.length > 1) {
-                                        const mainPart = document.createElement('span');
-                                        mainPart.className = 'font-medium';
-                                        mainPart.textContent = components[0];
+                                //     // Format the display to highlight the main part
+                                //     if (components.length > 1) {
+                                //         const mainPart = document.createElement('span');
+                                //         mainPart.className = 'font-medium';
+                                //         mainPart.textContent = components[0];
                                         
-                                        const secondaryPart = document.createElement('span');
-                                        secondaryPart.className = 'text-gray-500 ml-1';
-                                        secondaryPart.textContent = components.slice(1).join(', ');
+                                //         const secondaryPart = document.createElement('span');
+                                //         secondaryPart.className = 'text-gray-500 ml-1';
+                                //         secondaryPart.textContent = components.slice(1).join(', ');
                                         
-                                        item.appendChild(mainPart);
-                                        item.appendChild(secondaryPart);
-                                    } else {
-                                        item.textContent = feature.place_name;
-                                    }
+                                //         item.appendChild(mainPart);
+                                //         item.appendChild(secondaryPart);
+                                //     } else {
+                                //         item.textContent = feature.place_name;
+                                //     }
                                     
-                                    // Store the full place name as a data attribute
-                                    item.dataset.placeName = feature.place_name;
+                                //     // Store the full place name as a data attribute
+                                //     item.dataset.placeName = feature.place_name;
                                     
-                                    // Store context data for more precise searching
-                                    if (feature.context) {
-                                        const contextData = {};
-                                        feature.context.forEach(ctx => {
-                                            const id = ctx.id.split('.')[0];
-                                            contextData[id] = ctx.text;
-                                        });
+                                //     // Store context data for more precise searching
+                                //     if (feature.context) {
+                                //         const contextData = {};
+                                //         feature.context.forEach(ctx => {
+                                //             const id = ctx.id.split('.')[0];
+                                //             contextData[id] = ctx.text;
+                                //         });
                                         
-                                        if (feature.place_type[0] === 'place') {
-                                            contextData.city = feature.text;
-                                        } else if (feature.place_type[0] === 'region') {
-                                            contextData.state = feature.text;
-                                        }
+                                //         if (feature.place_type[0] === 'place') {
+                                //             contextData.city = feature.text;
+                                //         } else if (feature.place_type[0] === 'region') {
+                                //             contextData.state = feature.text;
+                                //         }
                                         
-                                        item.dataset.context = JSON.stringify(contextData);
-                                    }
+                                //         item.dataset.context = JSON.stringify(contextData);
+                                //     }
                                     
-                                    item.addEventListener('click', function() {
-                                        searchInput.value = this.dataset.placeName;
-                                        resultsContainer.classList.add('hidden');
+                                //     item.addEventListener('click', function() {
+                                //         searchInput.value = this.dataset.placeName;
+                                //         resultsContainer.classList.add('hidden');
                                         
-                                        // Optional: Submit the form immediately
-                                        // searchForm.submit();
-                                    });
+                                //         // Optional: Submit the form immediately
+                                //         // searchForm.submit();
+                                //     });
                                     
-                                    resultsContainer.appendChild(item);
-                                });
+                                //     resultsContainer.appendChild(item);
+                                // });
                                 
                                 // Now fetch property-specific suggestions from your database
                                 fetch(`/property-suggestions?q=${encodeURIComponent(query)}`)
