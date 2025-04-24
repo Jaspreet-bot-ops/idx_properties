@@ -20,20 +20,17 @@ class PropertyApiController extends Controller
         ]);
         
         // Filter properties by development status using the relationship
-        $developmentStatuses = [
-            'Completed', 'FinishedLots', 'Proposed', 'RawLand', 
-            'RoughGrade', 'SitePlanApproved', 'SitePlanFiled', 'UnderConstruction'
-        ];
+        // $developmentStatuses = [
+        //     'Completed', 'FinishedLots', 'Proposed', 'RawLand', 
+        //     'RoughGrade', 'SitePlanApproved', 'SitePlanFiled', 'UnderConstruction'
+        // ];
         
-        $query->whereHas('details', function($q) use ($developmentStatuses) {
-            $q->whereIn('DevelopmentStatus', $developmentStatuses);
-        });
+        // $query->whereHas('details', function($q) use ($developmentStatuses) {
+        //     $q->whereIn('DevelopmentStatus', $developmentStatuses);
+        // });
 
         // Apply YearBuilt filter (null or greater than 2024)
-        $query->where(function($q) {
-            $q->whereNull('YearBuilt')
-              ->orWhere('YearBuilt', '>', 2024);
-        });
+        $query->where('YearBuilt', '>', 2024);
 
         // Apply StandardStatus filter
         $query->where('StandardStatus', 'Active');
