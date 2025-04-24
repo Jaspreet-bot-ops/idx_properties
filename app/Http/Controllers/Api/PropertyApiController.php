@@ -18,16 +18,6 @@ class PropertyApiController extends Controller
             'schools',
             'financialDetails'
         ]);
-        
-        // Filter properties by development status using the relationship
-        // $developmentStatuses = [
-        //     'Completed', 'FinishedLots', 'Proposed', 'RawLand', 
-        //     'RoughGrade', 'SitePlanApproved', 'SitePlanFiled', 'UnderConstruction'
-        // ];
-        
-        // $query->whereHas('details', function($q) use ($developmentStatuses) {
-        //     $q->whereIn('DevelopmentStatus', $developmentStatuses);
-        // });
 
         // Apply YearBuilt filter (null or greater than 2024)
         $query->where('YearBuilt', '>', 2024);
@@ -93,7 +83,6 @@ class PropertyApiController extends Controller
         $request->merge(['limit' => 8, 'page' => 1]);
         return $this->getNewDevelopments($request);
     }
-
 
     public function getCondominiums(Request $request)
     {
