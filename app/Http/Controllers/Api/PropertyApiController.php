@@ -54,11 +54,13 @@ class PropertyApiController extends Controller
                       ->select('properties.*'); // Make sure we only select from the properties table
             } else {
                 // For columns in the main properties table
-                $query->orderBy($orderBy, $direction);
+                $query->orderByRaw("CASE WHEN PropertySubType = 'Condominium' THEN 0 ELSE 1 END")
+                    ->orderBy('YearBuilt', 'desc');
             }
         } else {
             // Default ordering
-            $query->orderBy('YearBuilt', 'desc');
+            $query->orderByRaw("CASE WHEN PropertySubType = 'Condominium' THEN 0 ELSE 1 END")
+                ->orderBy('YearBuilt', 'desc');
         }
 
         // Get the total count before pagination
