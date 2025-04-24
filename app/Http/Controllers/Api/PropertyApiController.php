@@ -94,4 +94,70 @@ class PropertyApiController extends Controller
         return $this->getNewDevelopments($request);
     }
 
+
+    public function getCondominiums(Request $request)
+    {
+        // Start with the base query
+        $query = Property::with([
+            'details',
+            'amenities',
+            'media',
+            'schools',
+            'financialDetails'
+        ]);
+        
+        // Filter properties by PropertySubType = Condominium
+        $query->where('PropertySubType', 'Condominium');
+        
+        // Apply StandardStatus filter (Active properties only)
+        $query->where('StandardStatus', 'Active');
+
+        // Apply ordering if requested
+        if ($request->has('orderby')) {
+            $orderBy = $request->input('orderby');
+            $direction = 'asc';
+            
+            if (strpos($orderBy, ' desc') !== false) {
+                $orderBy = str_replace(' desc', '', $orderBy);
+                $direction = 'desc';
+            }
+            
+            // Check if the order column is in the details table
+            if (in_array($orderBy, ['DevelopmentStatus'])) {
+                // For columns in related tables, we need to use a different approach
+                $query->join('property_details', 'properties.id', '=', 'property_details.property_id')
+                      ->orderBy('property_details.' . $orderBy, $direction)
+                      ->select('properties.*'); // Make sure we only select from the properties table
+            } else {
+                // For columns in the main properties table
+                $query->orderBy($orderBy, $direction);
+            }
+        } else {
+            // Default ordering by ListPrice
+            $query->orderBy('ListPrice', 'desc');
+        }
+
+        // Get the total count before pagination
+        $totalCount = $query->count();
+        
+        // Handle pagination parameters
+        $limit = $request->input('limit', 10); // Default to 10 items per page
+        $page = $request->input('page', 1);    // Default to first page
+        $offset = ($page - 1) * $limit;        // Calculate the offset
+        
+        // Apply limit and offset
+        $properties = $query->skip($offset)->take($limit)->get();
+        
+        // Format the response with success, data, and meta fields
+        return response()->json([
+            'success' => true,
+            'data' => $properties,
+            'meta' => [
+                'current_page' => (int)$page,
+                'per_page' => (int)$limit,
+                'total' => $totalCount,
+                'has_more' => ($offset + $limit) < $totalCount
+            ]
+        ]);
+    }
 }

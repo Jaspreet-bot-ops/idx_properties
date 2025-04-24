@@ -27,9 +27,14 @@ Route::middleware('auth')->group(function () {
 
 // API for new developments
 Route::get('/api/new-developments', [PropertyApiController::class, 'getNewDevelopments'])->name('api.new-developments');
+// Make sure this route exists in your routes/web.php file
+Route::get('/api/property-suggestions', [PropertySuggestionController::class, 'suggestion'])->name('api.property-suggestions');
 
 // API for homepage developments (just 8 items)
 Route::get('/api/home-developments', [PropertyApiController::class, 'getHomePageDevelopments'])->name('api.home-developments');
+// Add this to your routes/web.php file
+Route::get('/api/condominiums', [App\Http\Controllers\Api\PropertyApiController::class, 'getCondominiums'])->name('api.condominiums');
+
 
 Route::get('/property-suggestions', [PropertySuggestionController::class, 'index']);
 

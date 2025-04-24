@@ -12,10 +12,10 @@ class FetchDataFromTrestle extends Command
 {
 
     public function __construct()
-{
-    parent::__construct();
-    ini_set('memory_limit', '512M');
-}
+    {
+        parent::__construct();
+        ini_set('memory_limit', '512M');
+    }
 
     /**
      * The name and signature of the console command.
@@ -409,7 +409,7 @@ class FetchDataFromTrestle extends Command
     {
         // Map basic property fields
         $fieldsToMap = [
-            'ListingId', 'ListingKey', 'ListingKeyNumeric', 'PropertyType', 'PropertySubType',
+            'ListingId', 'ListingKey', 'ListingKeyNumeric', 'PropertyType', 'PropertySubType', 'BuildingName',
             'StandardStatus', 'MlsStatus', 'ListPrice', 'ClosePrice', 'OriginalListPrice',
             'PreviousListPrice', 'StreetNumber', 'StreetNumberNumeric', 'StreetDirPrefix',
             'StreetName', 'StreetSuffix', 'StreetDirSuffix', 'UnitNumber', 'City',
