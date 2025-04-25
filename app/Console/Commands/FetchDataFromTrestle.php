@@ -602,7 +602,8 @@ class FetchDataFromTrestle extends Command
             $mediaModel->url = $media['MediaURL'];
             $mediaModel->media_type = $media['MediaCategory'] ?? 'Image';
             $mediaModel->title = $media['MediaObjectID'] ?? null;
-            $mediaModel->description = $media['MediaDescription'] ?? null;
+            $mediaModel->description = $media['ShortDescription'] ?? null;
+            $mediaModel->image_of = $media['ImageOf'] ?? null;
             $mediaModel->order = $index + 1;
             $mediaModel->is_primary = $index === 0; // First image is primary
             $mediaModel->mime_type = $this->getMimeTypeFromUrl($media['MediaURL']);

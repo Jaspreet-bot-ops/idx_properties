@@ -34,7 +34,7 @@ Route::get('/api/property-suggestions', [PropertySuggestionController::class, 's
 Route::get('/api/home-developments', [PropertyApiController::class, 'getHomePageDevelopments'])->name('api.home-developments');
 // Add this to your routes/web.php file
 Route::get('/api/condominiums', [App\Http\Controllers\Api\PropertyApiController::class, 'getCondominiums'])->name('api.condominiums');
-
+Route::get('/api/search', [PropertyApiController::class, 'search']);
 
 Route::get('/property-suggestions', [PropertySuggestionController::class, 'index']);
 

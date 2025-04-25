@@ -198,7 +198,7 @@ class UpdateTrestleProperties extends Command
 
                             // Map property data to model
                             $this->mapPropertyData($property, $propertyData);
-                            $property->updated = ($property->updated ?? 0) + 1;
+                            $property->updated = 1;
 
                             // Geocode the property address if option is enabled
                             if ($geocode && $property->UnparsedAddress) {
@@ -941,7 +941,8 @@ class UpdateTrestleProperties extends Command
             $mediaModel->url = $media['MediaURL'];
             $mediaModel->media_type = $media['MediaCategory'] ?? 'Image';
             $mediaModel->title = $media['MediaObjectID'] ?? null;
-            $mediaModel->description = $media['MediaDescription'] ?? null;
+            $mediaModel->description = $media['ShortDescription'] ?? null;
+            $mediaModel->image_of = $media['ImageOf'] ?? null;
             $mediaModel->order = $index + 1;
             $mediaModel->is_primary = $index === 0; // First image is primary
             $mediaModel->mime_type = $this->getMimeTypeFromUrl($media['MediaURL']);
