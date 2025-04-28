@@ -33,9 +33,21 @@ Route::get('/api/property-suggestions', [PropertySuggestionController::class, 's
 // API for homepage developments (just 8 items)
 Route::get('/api/home-developments', [PropertyApiController::class, 'getHomePageDevelopments'])->name('api.home-developments');
 // Add this to your routes/web.php file
-Route::get('/api/condominiums', [App\Http\Controllers\Api\PropertyApiController::class, 'getCondominiums'])->name('api.condominiums');
+Route::get('/api/condominiums', [PropertyApiController::class, 'getCondominiums'])->name('api.condominiums');
 Route::get('/api/search', [PropertyApiController::class, 'search']);
 
-Route::get('/property-suggestions', [PropertySuggestionController::class, 'index']);
+
+Route::get('/api/autocomplete', [PropertySuggestionController::class, 'autocomplete']);
+Route::get('/api/property-suggestions', [PropertySuggestionController::class, 'index']);
+
+
+// Property detail endpoint
+Route::get('/api/properties/{id}', [PropertyApiController::class, 'propertyDetails']);
+
+// Building units endpoint
+Route::get('/api/buildings', [PropertyApiController::class, 'buildings']);
+
+// Place properties search endpoint
+Route::get('/api/propertiesByPlace', [PropertyApiController::class, 'places']);
 
 require __DIR__.'/auth.php';
