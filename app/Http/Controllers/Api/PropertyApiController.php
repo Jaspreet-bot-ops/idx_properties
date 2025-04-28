@@ -233,6 +233,8 @@ class PropertyApiController extends Controller
                 'StreetNumber',
                 'StreetName',
                 'City',
+                'StreetDirPrefix',
+                'StreetSuffix',
                 'StateOrProvince',
                 'PostalCode',
                 'PropertySubType',
@@ -333,10 +335,6 @@ class PropertyApiController extends Controller
                 'id' => $building->representative_id,
                 'building_name' => $buildingName,
                 'address' => $buildingName,
-                'full_address' => $building->StreetNumber .' '.  $building->StreetName .
-                         ($city ? ', ' . $city : '') . 
-                         ($building->StateOrProvince ? ', ' . $building->StateOrProvince : '') .
-                         ($building->PostalCode ? ' ' . $building->PostalCode : ''),
                 'city' => $city,
                 'state' => $building->StateOrProvince,
                 'postal_code' => $building->PostalCode,
@@ -506,10 +504,6 @@ class PropertyApiController extends Controller
                 'id' => $building->representative_id,
                 'building_name' => $buildingName,
                 'address' => $buildingName,
-                'full_address' => $building->StreetNumber .' '.  $building->StreetName .
-                         ($city ? ', ' . $city : '') . 
-                         ($building->StateOrProvince ? ', ' . $building->StateOrProvince : '') .
-                         ($building->PostalCode ? ' ' . $building->PostalCode : ''),
                 'city' => $city,
                 'state' => $building->StateOrProvince,
                 'postal_code' => $building->PostalCode,

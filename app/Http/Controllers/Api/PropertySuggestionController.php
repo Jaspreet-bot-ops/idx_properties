@@ -495,226 +495,16 @@ class PropertySuggestionController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    // public function autocomplete(Request $request)
-    // {
-    //     // Validate request
-    //     // dd("jaspreet");
-    //     // $request->validate([
-    //     //     'query' => 'required|string|min:2',
-    //     //     'limit' => 'nullable|integer|min:1|max:20',
-    //     // ]);
-
-    //     $query = $request->input('query');
-    //     $limit = $request->input('limit', 15); // Default 15 suggestions total
-
-    //     // Allocate limits for each category
-    //     $addressLimit = ceil($limit * 0.4); // 40% for addresses
-    //     $buildingLimit = ceil($limit * 0.3); // 30% for buildings
-    //     $placeLimit = ceil($limit * 0.3); // 30% for places
-
-    //     // Define property types that are typically individual properties
-    //     $individualPropertyTypes = [
-    //         'Land', 'SingleFamilyResidence', 'Business', 'BusinessOpportunity',
-    //         'UnimprovedLand', 'Special Purpose'
-    //     ];
-
-    //     // 1. ADDRESS SUGGESTIONS - Individual property addresses
-    //     $addressSuggestions = Property::select(
-    //         'id',
-    //         'ListingKey',
-    //         'StreetNumber',
-    //         'StreetName',
-    //         'UnitNumber',
-    //         'City',
-    //         'StateOrProvince',
-    //         'PostalCode',
-    //         'PropertySubType',
-    //         'ListPrice'
-    //     )
-    //         ->where('StandardStatus', 'Active')
-    //         ->where(function ($q) use ($query) {
-    //             $q->where('UnparsedAddress', 'like', "%{$query}%")
-    //                 ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$query}%")
-    //                 ->orWhere('StreetNumber', 'like', "{$query}%")
-    //                 ->orWhere('StreetName', 'like', "%{$query}%");
-    //         })
-    //         ->limit($addressLimit)
-    //         ->get()
-    //         ->map(function ($item) {
-    //             $address = trim($item->StreetNumber . ' ' . $item->StreetName);
-    //             if (!empty($item->UnitNumber)) {
-    //                 $address .= ' #' . $item->UnitNumber;
-    //             }
-
-    //             return [
-    //                 'type' => 'address',
-    //                 'id' => $item->id,
-    //                 'listing_key' => $item->ListingKey,
-    //                 'address' => $address,
-    //                 'city' => $item->City,
-    //                 'state' => $item->StateOrProvince,
-    //                 'postal_code' => $item->PostalCode,
-    //                 'property_type' => $item->PropertySubType,
-    //                 'price' => $item->ListPrice,
-    //                 'display_text' => $address .
-    //                     ($item->City ? ', ' . $item->City : '') .
-    //                     ($item->StateOrProvince ? ', ' . $item->StateOrProvince : ''),
-    //                 'action_url' => "/api/properties/{$item->id}"
-    //             ];
-    //         });
-
-    //     // 2. BUILDING SUGGESTIONS - Multi-unit buildings
-    //     $buildingSuggestions = DB::table('properties')
-    //         ->select(
-    //             'StreetNumber',
-    //             'StreetName',
-    //             'City',
-    //             'StateOrProvince',
-    //             'PostalCode',
-    //             'BuildingName',
-    //             DB::raw('COUNT(*) as unit_count'),
-    //             DB::raw('MIN(ListPrice) as min_price'),
-    //             DB::raw('MAX(ListPrice) as max_price')
-    //         )
-    //         ->where('StandardStatus', 'Active')
-    //         ->whereNotNull('StreetNumber')
-    //         ->whereNotNull('StreetName')
-    //         ->whereNotIn('PropertySubType', $individualPropertyTypes)
-    //         ->where(function ($q) use ($query) {
-    //             $q->where('UnparsedAddress', 'like', "%{$query}%")
-    //                 ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$query}%")
-    //                 ->orWhere('StreetNumber', 'like', "{$query}%")
-    //                 ->orWhere('StreetName', 'like', "%{$query}%")
-    //                 ->orWhere('BuildingName', 'like', "%{$query}%");
-    //         })
-    //         ->groupBy('StreetNumber', 'StreetName', 'City', 'StateOrProvince', 'PostalCode', 'BuildingName')
-    //         ->havingRaw('COUNT(*) > 1')
-    //         ->limit($buildingLimit)
-    //         ->get()
-    //         ->map(function ($item) {
-    //             $buildingName = !empty($item->BuildingName) ? $item->BuildingName : trim($item->StreetNumber . ' ' . $item->StreetName);
-
-    //             return [
-    //                 'type' => 'building',
-    //                 'building_name' => $buildingName,
-    //                 'street_number' => $item->StreetNumber,
-    //                 'street_name' => $item->StreetName,
-    //                 'address' => trim($item->StreetNumber . ' ' . $item->StreetName),
-    //                 'city' => $item->City,
-    //                 'state' => $item->StateOrProvince,
-    //                 'postal_code' => $item->PostalCode,
-    //                 'unit_count' => $item->unit_count,
-    //                 'min_price' => $item->min_price,
-    //                 'max_price' => $item->max_price,
-    //                 'display_text' => $buildingName .
-    //                     ($item->City ? ', ' . $item->City : '') .
-    //                     ($item->StateOrProvince ? ', ' . $item->StateOrProvince : '') .
-    //                     ' (' . $item->unit_count . ' units)',
-    //                 'action_url' => "/api/buildings?street_number={$item->StreetNumber}&street_name=" . urlencode($item->StreetName)
-    //             ];
-    //         });
-
-    //     // 3. PLACE SUGGESTIONS - Cities and States
-    //     // First get unique cities
-    //     $citySuggestions = DB::table('properties')
-    //         ->select('City', 'StateOrProvince')
-    //         ->where('City', 'like', "%{$query}%")
-    //         ->whereNotNull('City')
-    //         ->where('City', '!=', '')
-    //         ->groupBy('City', 'StateOrProvince')
-    //         ->limit($placeLimit)
-    //         ->get()
-    //         ->map(function ($item) {
-    //             return [
-    //                 'type' => 'place',
-    //                 'place_type' => 'city',
-    //                 'name' => $item->City,
-    //                 'state' => $item->StateOrProvince,
-    //                 'display_text' => $item->City . ($item->StateOrProvince ? ', ' . $item->StateOrProvince : ''),
-    //                 'action_url' => "/api/properties/search?city=" . urlencode($item->City)
-    //             ];
-    //         });
-
-    //     // Then get states
-    //     $stateSuggestions = DB::table('properties')
-    //         ->select('StateOrProvince')
-    //         ->where('StateOrProvince', 'like', "%{$query}%")
-    //         ->whereNotNull('StateOrProvince')
-    //         ->where('StateOrProvince', '!=', '')
-    //         ->groupBy('StateOrProvince')
-    //         ->limit($placeLimit)
-    //         ->get()
-    //         ->map(function ($item) {
-    //             return [
-    //                 'type' => 'place',
-    //                 'place_type' => 'state',
-    //                 'name' => $item->StateOrProvince,
-    //                 'display_text' => $item->StateOrProvince,
-    //                 'action_url' => "/api/properties/search?state=" . urlencode($item->StateOrProvince)
-    //             ];
-    //         });
-
-    //     // Combine city and state suggestions
-    //     $placeSuggestions = $citySuggestions->concat($stateSuggestions)->take($placeLimit);
-
-    //     // Combine all suggestions
-    //     $allSuggestions = collect([])
-    //         ->concat($addressSuggestions)
-    //         ->concat($buildingSuggestions)
-    //         ->concat($placeSuggestions)
-    //         ->sortBy(function ($item) use ($query) {
-    //             // Sort by relevance - items that start with the query should come first
-    //             $searchableText = $item['type'] === 'address' || $item['type'] === 'building'
-    //                 ? $item['address']
-    //                 : $item['name'];
-
-    //             if (stripos($searchableText, $query) === 0) {
-    //                 return 0; // Highest priority if text starts with query
-    //             } else if (stripos($searchableText, $query) !== false) {
-    //                 return 1; // Medium priority if text contains query
-    //             } else {
-    //                 return 2; // Lowest priority for other matches
-    //             }
-    //         })
-    //         ->values()
-    //         ->take($limit);
-
-    //     // Group suggestions by type
-    //     $groupedSuggestions = [
-    //         'addresses' => $allSuggestions->where('type', 'address')->values(),
-    //         'buildings' => $allSuggestions->where('type', 'building')->values(),
-    //         'places' => $allSuggestions->where('type', 'place')->values()
-    //     ];
-
-    //     return response()->json([
-    //         'suggestions' => $groupedSuggestions
-    //     ]);
-    // }
-
-
-    /**
-     * Get address autocomplete suggestions categorized by type
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function autocomplete(Request $request)
     {
-        // Get search parameters - support both 'q' and 'query' parameters
-        $query = $request->input('q') ?? $request->input('query');
-        $type = $request->input('type'); // 'buy' or 'rent'
-        $limit = $request->input('limit', 15); // Default 15 suggestions total
+        // Validate request
+        $request->validate([
+            'query' => 'required|string|min:2',
+            'limit' => 'nullable|integer|min:1|max:20',
+        ]);
 
-        // Validate query parameter
-        if (empty($query) || strlen($query) < 2) {
-            return response()->json([
-                'suggestions' => [
-                    'addresses' => [],
-                    'buildings' => [],
-                    'places' => []
-                ]
-            ]);
-        }
+        $query = $request->input('query');
+        $limit = $request->input('limit', 15); // Default 15 suggestions total
 
         // Allocate limits for each category
         $addressLimit = ceil($limit * 0.4); // 40% for addresses
@@ -727,27 +517,8 @@ class PropertySuggestionController extends Controller
             'UnimprovedLand', 'Special Purpose'
         ];
 
-        // Base query with common conditions
-        $baseQuery = Property::query()->where('StandardStatus', 'Active');
-
-        // Apply type filter if provided
-        if ($type) {
-            switch (strtolower($type)) {
-                case 'buy':
-                    // Properties for sale
-                    $baseQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
-                    break;
-
-                case 'rent':
-                    // Properties for rent
-                    $baseQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
-                    break;
-            }
-        }
-
         // 1. ADDRESS SUGGESTIONS - Individual property addresses
-        $addressQuery = clone $baseQuery;
-        $addressSuggestions = $addressQuery->select(
+        $addressSuggestions = Property::select(
             'id',
             'ListingKey',
             'StreetNumber',
@@ -759,22 +530,13 @@ class PropertySuggestionController extends Controller
             'PropertySubType',
             'ListPrice'
         )
+            ->where('StandardStatus', 'Active')
             ->where(function ($q) use ($query) {
-                // Prioritize exact matches first
-                $q->where('UnparsedAddress', 'like', "{$query}%")
-                    ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "{$query}%")
-                    // Then try partial matches
-                    ->orWhere('UnparsedAddress', 'like', "%{$query}%")
+                $q->where('UnparsedAddress', 'like', "%{$query}%")
+                    ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$query}%")
                     ->orWhere('StreetNumber', 'like', "{$query}%")
-                    ->orWhere('StreetName', 'like', "%{$query}%")
-                    ->orWhere('City', 'like', "%{$query}%")
-                    ->orWhere('StateOrProvince', 'like', "%{$query}%");
+                    ->orWhere('StreetName', 'like', "%{$query}%");
             })
-            ->orderByRaw("CASE 
-            WHEN UnparsedAddress LIKE '{$query}%' THEN 1
-            WHEN CONCAT(StreetNumber, ' ', StreetName) LIKE '{$query}%' THEN 2
-            ELSE 3
-        END")
             ->limit($addressLimit)
             ->get()
             ->map(function ($item) {
@@ -801,7 +563,7 @@ class PropertySuggestionController extends Controller
             });
 
         // 2. BUILDING SUGGESTIONS - Multi-unit buildings
-        $buildingQuery = DB::table('properties')
+        $buildingSuggestions = DB::table('properties')
             ->select(
                 'StreetNumber',
                 'StreetName',
@@ -816,38 +578,16 @@ class PropertySuggestionController extends Controller
             ->where('StandardStatus', 'Active')
             ->whereNotNull('StreetNumber')
             ->whereNotNull('StreetName')
-            ->whereNotIn('PropertySubType', $individualPropertyTypes);
-
-        // Apply type filter to buildings
-        if ($type) {
-            switch (strtolower($type)) {
-                case 'buy':
-                    $buildingQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
-                    break;
-                case 'rent':
-                    $buildingQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
-                    break;
-            }
-        }
-
-        $buildingSuggestions = $buildingQuery->where(function ($q) use ($query) {
-            // Prioritize exact matches first
-            $q->where(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "{$query}%")
-                ->orWhere('BuildingName', 'like', "{$query}%")
-                // Then try partial matches
-                ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$query}%")
-                ->orWhere('BuildingName', 'like', "%{$query}%")
-                ->orWhere('StreetNumber', 'like', "{$query}%")
-                ->orWhere('StreetName', 'like', "%{$query}%")
-                ->orWhere('City', 'like', "%{$query}%");
-        })
+            ->whereNotIn('PropertySubType', $individualPropertyTypes)
+            ->where(function ($q) use ($query) {
+                $q->where('UnparsedAddress', 'like', "%{$query}%")
+                    ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$query}%")
+                    ->orWhere('StreetNumber', 'like', "{$query}%")
+                    ->orWhere('StreetName', 'like', "%{$query}%")
+                    ->orWhere('BuildingName', 'like', "%{$query}%");
+            })
             ->groupBy('StreetNumber', 'StreetName', 'City', 'StateOrProvince', 'PostalCode', 'BuildingName')
             ->havingRaw('COUNT(*) > 1')
-            ->orderByRaw("CASE 
-            WHEN CONCAT(StreetNumber, ' ', StreetName) LIKE '{$query}%' THEN 1
-            WHEN BuildingName LIKE '{$query}%' THEN 2
-            ELSE 3
-        END")
             ->limit($buildingLimit)
             ->get()
             ->map(function ($item) {
@@ -880,9 +620,7 @@ class PropertySuggestionController extends Controller
             ->where('City', 'like', "%{$query}%")
             ->whereNotNull('City')
             ->where('City', '!=', '')
-            ->where('City', '!=', ',') // Exclude invalid city names
             ->groupBy('City', 'StateOrProvince')
-            ->orderByRaw("CASE WHEN City LIKE '{$query}%' THEN 1 ELSE 2 END")
             ->limit($placeLimit)
             ->get()
             ->map(function ($item) {
@@ -903,7 +641,6 @@ class PropertySuggestionController extends Controller
             ->whereNotNull('StateOrProvince')
             ->where('StateOrProvince', '!=', '')
             ->groupBy('StateOrProvince')
-            ->orderByRaw("CASE WHEN StateOrProvince LIKE '{$query}%' THEN 1 ELSE 2 END")
             ->limit($placeLimit)
             ->get()
             ->map(function ($item) {
@@ -928,7 +665,7 @@ class PropertySuggestionController extends Controller
                 // Sort by relevance - items that start with the query should come first
                 $searchableText = $item['type'] === 'address' || $item['type'] === 'building'
                     ? $item['address']
-                    : ($item['type'] === 'place' ? $item['name'] : '');
+                    : $item['name'];
 
                 if (stripos($searchableText, $query) === 0) {
                     return 0; // Highest priority if text starts with query
