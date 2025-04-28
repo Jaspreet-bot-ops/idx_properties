@@ -350,24 +350,28 @@ class PropertyApiController extends Controller
             // Add related data from the representative property
             if ($property) {
                 // Add details if available
-                if (isset($property->details)) {
-                    $formattedBuilding['details'] = $property->details;
+                if (isset($property->media)) {
+                    $formattedBuilding['media'] = $property->media;
                 }
 
-                // Add amenities if available
-                if (isset($property->amenities)) {
-                    $formattedBuilding['amenities'] = $property->amenities;
-                }
+                // if (isset($property->details)) {
+                //     $formattedBuilding['details'] = $property->details;
+                // }
 
-                // Add schools if available
-                if (isset($property->schools)) {
-                    $formattedBuilding['schools'] = $property->schools;
-                }
+                // // Add amenities if available
+                // if (isset($property->amenities)) {
+                //     $formattedBuilding['amenities'] = $property->amenities;
+                // }
 
-                // Add financial details if available
-                if (isset($property->financialDetails)) {
-                    $formattedBuilding['financial_details'] = $property->financialDetails;
-                }
+                // // Add schools if available
+                // if (isset($property->schools)) {
+                //     $formattedBuilding['schools'] = $property->schools;
+                // }
+
+                // // Add financial details if available
+                // if (isset($property->financialDetails)) {
+                //     $formattedBuilding['financial_details'] = $property->financialDetails;
+                // }
             }
 
             return $formattedBuilding;
@@ -472,7 +476,7 @@ class PropertyApiController extends Controller
         $representativeIds = $buildings->pluck('representative_id')->toArray();
 
         // Fetch the representative properties with their relationships
-        $representativeProperties = Property::with(['details', 'media'])
+        $representativeProperties = Property::with([ 'media'])
             ->whereIn('id', $representativeIds)
             ->get()
             ->keyBy('id'); // Index by ID for easier lookup
@@ -525,122 +529,122 @@ class PropertyApiController extends Controller
         ]);
     }
 
-    public function getDevelopments(Request $request)
-    {
-        // Start with the base query to get developments/buildings
-        $query = Property::with([
-            'details',
-            'media'
-        ])
-            ->where('StandardStatus', 'Active')
-            ->where(function ($q) {
-                $q->where('YearBuilt', '>', 2024)
-                    ->orWhere('PropertySubType', 'Condominium');
-            });
+    // public function getDevelopments(Request $request)
+    // {
+    //     // Start with the base query to get developments/buildings
+    //     $query = Property::with([
+    //         'details',
+    //         'media'
+    //     ])
+    //         ->where('StandardStatus', 'Active')
+    //         ->where(function ($q) {
+    //             $q->where('YearBuilt', '>', 2024)
+    //                 ->orWhere('PropertySubType', 'Condominium');
+    //         });
 
-        // Group by address or development name
-        $query->select(
-            'properties.*',
-            DB::raw('COUNT(*) as unit_count'),
-            DB::raw('MIN(ListPrice) as min_price'),
-            DB::raw('MAX(ListPrice) as max_price')
-        )
-            ->groupBy('UnparsedAddress') // Or use ProjectName or another field that identifies the development
-            ->havingRaw('COUNT(*) >= 1');
+    //     // Group by address or development name
+    //     $query->select(
+    //         'properties.*',
+    //         DB::raw('COUNT(*) as unit_count'),
+    //         DB::raw('MIN(ListPrice) as min_price'),
+    //         DB::raw('MAX(ListPrice) as max_price')
+    //     )
+    //         ->groupBy('UnparsedAddress') // Or use ProjectName or another field that identifies the development
+    //         ->havingRaw('COUNT(*) >= 1');
 
-        // Apply ordering if requested
-        if ($request->has('orderby')) {
-            $orderBy = $request->input('orderby');
-            $direction = 'asc';
+    //     // Apply ordering if requested
+    //     if ($request->has('orderby')) {
+    //         $orderBy = $request->input('orderby');
+    //         $direction = 'asc';
 
-            if (strpos($orderBy, ' desc') !== false) {
-                $orderBy = str_replace(' desc', '', $orderBy);
-                $direction = 'desc';
-            }
+    //         if (strpos($orderBy, ' desc') !== false) {
+    //             $orderBy = str_replace(' desc', '', $orderBy);
+    //             $direction = 'desc';
+    //         }
 
-            // Apply ordering
-            $query->orderBy($orderBy, $direction);
-        } else {
-            // Default ordering
-            $query->orderByRaw("CASE WHEN PropertySubType = 'Condominium' THEN 0 ELSE 1 END")
-                ->orderBy('YearBuilt', 'desc');
-        }
+    //         // Apply ordering
+    //         $query->orderBy($orderBy, $direction);
+    //     } else {
+    //         // Default ordering
+    //         $query->orderByRaw("CASE WHEN PropertySubType = 'Condominium' THEN 0 ELSE 1 END")
+    //             ->orderBy('YearBuilt', 'desc');
+    //     }
 
-        // Get the total count before pagination
-        $totalCount = $query->count(DB::raw('DISTINCT UnparsedAddress'));
+    //     // Get the total count before pagination
+    //     $totalCount = $query->count(DB::raw('DISTINCT UnparsedAddress'));
 
-        // Handle pagination parameters
-        $limit = $request->input('limit', 10);
-        $page = $request->input('page', 1);
-        $offset = ($page - 1) * $limit;
+    //     // Handle pagination parameters
+    //     $limit = $request->input('limit', 10);
+    //     $page = $request->input('page', 1);
+    //     $offset = ($page - 1) * $limit;
 
-        // Apply limit and offset
-        $developments = $query->skip($offset)->take($limit)->get();
+    //     // Apply limit and offset
+    //     $developments = $query->skip($offset)->take($limit)->get();
 
-        // Format the response
-        return response()->json([
-            'developments' => $developments,
-            'meta' => [
-                'current_page' => (int)$page,
-                'per_page' => (int)$limit,
-                'total' => $totalCount,
-                'has_more' => ($offset + $limit) < $totalCount
-            ]
-        ]);
-    }
+    //     // Format the response
+    //     return response()->json([
+    //         'developments' => $developments,
+    //         'meta' => [
+    //             'current_page' => (int)$page,
+    //             'per_page' => (int)$limit,
+    //             'total' => $totalCount,
+    //             'has_more' => ($offset + $limit) < $totalCount
+    //         ]
+    //     ]);
+    // }
 
-    public function getDevelopmentUnits(Request $request, $developmentId)
-    {
-        // Get the development first to extract the address or identifier
-        $development = Property::findOrFail($developmentId);
-        $developmentAddress = $development->UnparsedAddress;
+    // public function getDevelopmentUnits(Request $request, $developmentId)
+    // {
+    //     // Get the development first to extract the address or identifier
+    //     $development = Property::findOrFail($developmentId);
+    //     $developmentAddress = $development->UnparsedAddress;
 
-        // Get all units in this development
-        $query = Property::with([
-            'details',
-            'amenities',
-            'media',
-            'schools',
-            'financialDetails'
-        ])
-            ->where('UnparsedAddress', $developmentAddress)
-            ->where('StandardStatus', 'Active');
+    //     // Get all units in this development
+    //     $query = Property::with([
+    //         'details',
+    //         'amenities',
+    //         'media',
+    //         'schools',
+    //         'financialDetails'
+    //     ])
+    //         ->where('UnparsedAddress', $developmentAddress)
+    //         ->where('StandardStatus', 'Active');
 
-        // Apply ordering
-        if ($request->has('orderby')) {
-            $orderBy = $request->input('orderby');
-            $direction = 'asc';
+    //     // Apply ordering
+    //     if ($request->has('orderby')) {
+    //         $orderBy = $request->input('orderby');
+    //         $direction = 'asc';
 
-            if (strpos($orderBy, ' desc') !== false) {
-                $orderBy = str_replace(' desc', '', $orderBy);
-                $direction = 'desc';
-            }
+    //         if (strpos($orderBy, ' desc') !== false) {
+    //             $orderBy = str_replace(' desc', '', $orderBy);
+    //             $direction = 'desc';
+    //         }
 
-            $query->orderBy($orderBy, $direction);
-        } else {
-            // Default ordering by price
-            $query->orderBy('ListPrice', 'asc');
-        }
+    //         $query->orderBy($orderBy, $direction);
+    //     } else {
+    //         // Default ordering by price
+    //         $query->orderBy('ListPrice', 'asc');
+    //     }
 
-        // Handle pagination
-        $limit = $request->input('limit', 20);
-        $page = $request->input('page', 1);
-        $offset = ($page - 1) * $limit;
+    //     // Handle pagination
+    //     $limit = $request->input('limit', 20);
+    //     $page = $request->input('page', 1);
+    //     $offset = ($page - 1) * $limit;
 
-        $totalCount = $query->count();
-        $units = $query->skip($offset)->take($limit)->get();
+    //     $totalCount = $query->count();
+    //     $units = $query->skip($offset)->take($limit)->get();
 
-        return response()->json([
-            'development' => $development,
-            'units' => $units,
-            'meta' => [
-                'current_page' => (int)$page,
-                'per_page' => (int)$limit,
-                'total' => $totalCount,
-                'has_more' => ($offset + $limit) < $totalCount
-            ]
-        ]);
-    }
+    //     return response()->json([
+    //         'development' => $development,
+    //         'units' => $units,
+    //         'meta' => [
+    //             'current_page' => (int)$page,
+    //             'per_page' => (int)$limit,
+    //             'total' => $totalCount,
+    //             'has_more' => ($offset + $limit) < $totalCount
+    //         ]
+    //     ]);
+    // }
 
     public function searchProperties(Request $request)
     {
