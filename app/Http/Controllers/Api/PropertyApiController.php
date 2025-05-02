@@ -480,7 +480,7 @@ class PropertyApiController extends Controller
         $representativeIds = $buildings->pluck('representative_id')->toArray();
 
         // Fetch the representative properties with their relationships
-        $representativeProperties = Property::with([ 'media'])
+        $representativeProperties = Property::with(['media'])
             ->whereIn('id', $representativeIds)
             ->get()
             ->keyBy('id'); // Index by ID for easier lookup
@@ -915,16 +915,186 @@ class PropertyApiController extends Controller
         ]);
     }
 
+    // public function buildings(Request $request)
+    // {
+    //     // Validate request
+    //     $request->validate([
+    //         'street_number' => 'required|string',
+    //         'street_name' => 'required|string',
+    //         'property_type' => 'nullable|string',
+    //         'property_subtype' => 'nullable|string',
+    //         'min_price' => 'nullable|numeric',
+    //         'max_price' => 'nullable|numeric',
+    //         'min_beds' => 'nullable|integer',
+    //         'max_beds' => 'nullable|integer',
+    //         'min_baths' => 'nullable|integer',
+    //         'max_baths' => 'nullable|integer',
+    //         'min_living_size' => 'nullable|numeric',
+    //         'max_living_size' => 'nullable|numeric',
+    //         'min_land_size' => 'nullable|numeric',
+    //         'max_land_size' => 'nullable|numeric',
+    //         'min_year_built' => 'nullable|integer|min:1800|max:2025',
+    //         'max_year_built' => 'nullable|integer|min:1800|max:2025',
+    //     ]);
+
+    //     $streetNumber = $request->input('street_number');
+    //     $streetName = $request->input('street_name');
+
+    //     // Get building information
+    //     $buildingInfo = DB::table('properties')
+    //         ->select(
+    //             'StreetNumber',
+    //             'StreetName',
+    //             'City',
+    //             'StateOrProvince',
+    //             'PostalCode',
+    //             'BuildingName',
+    //             DB::raw('COUNT(*) as unit_count'),
+    //             DB::raw('MIN(ListPrice) as min_price'),
+    //             DB::raw('MAX(ListPrice) as max_price')
+    //         )
+    //         ->where('StreetNumber', $streetNumber)
+    //         ->where('StreetName', $streetName)
+    //         ->where('StandardStatus', 'Active')
+    //         ->groupBy('StreetNumber', 'StreetName', 'City', 'StateOrProvince', 'PostalCode', 'BuildingName')
+    //         ->first();
+
+    //     if (!$buildingInfo) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Building not found'
+    //         ], 404);
+    //     }
+
+    //     // Start building the query for units
+    //     $unitsQuery = Property::with(['details', 'media'])
+    //         ->where('StreetNumber', $streetNumber)
+    //         ->where('StreetName', $streetName)
+    //         ->where('StandardStatus', 'Active');
+
+    //     // Apply property type filter if provided
+    //     if ($request->filled('property_type')) {
+    //         $unitsQuery->where('PropertyType', $request->property_type);
+    //     }
+
+    //     // Apply property subtype filter if provided
+    //     if ($request->filled('property_subtype')) {
+    //         $unitsQuery->where('PropertySubType', $request->property_subtype);
+    //     }
+
+    //     // Apply price filters if provided
+    //     if ($request->filled('min_price')) {
+    //         $unitsQuery->where('ListPrice', '>=', $request->min_price);
+    //     }
+    //     if ($request->filled('max_price')) {
+    //         $unitsQuery->where('ListPrice', '<=', $request->max_price);
+    //     }
+
+    //     // Apply bedroom filters if provided
+    //     if ($request->filled('min_beds')) {
+    //         $unitsQuery->where('BedroomsTotal', '>=', $request->min_beds);
+    //     }
+    //     if ($request->filled('max_beds')) {
+    //         $unitsQuery->where('BedroomsTotal', '<=', $request->max_beds);
+    //     }
+
+    //     // Apply bathroom filters if provided
+    //     if ($request->filled('min_baths')) {
+    //         $unitsQuery->where('BathroomsTotalInteger', '>=', $request->min_baths);
+    //     }
+    //     if ($request->filled('max_baths')) {
+    //         $unitsQuery->where('BathroomsTotalInteger', '<=', $request->max_baths);
+    //     }
+
+    //     // Apply living size filters if provided
+    //     if ($request->filled('min_living_size')) {
+    //         $unitsQuery->where('LivingArea', '>=', $request->min_living_size);
+    //     }
+    //     if ($request->filled('max_living_size')) {
+    //         $unitsQuery->where('LivingArea', '<=', $request->max_living_size);
+    //     }
+
+    //     // Apply land size filters if provided
+    //     if ($request->filled('min_land_size')) {
+    //         $unitsQuery->where('LotSizeSquareFeet', '>=', $request->min_land_size);
+    //     }
+    //     if ($request->filled('max_land_size')) {
+    //         $unitsQuery->where('LotSizeSquareFeet', '<=', $request->max_land_size);
+    //     }
+
+    //     // Apply year built filters if provided
+    //     if ($request->filled('min_year_built')) {
+    //         $unitsQuery->where('YearBuilt', '>=', $request->min_year_built);
+    //     }
+    //     if ($request->filled('max_year_built')) {
+    //         $unitsQuery->where('YearBuilt', '<=', $request->max_year_built);
+    //     }
+
+    //     // Get all filtered units in the building
+    //     $units = $unitsQuery->get();
+
+    //     // Separate units by type (sale vs rental)
+    //     $salesUnits = $units->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+    //     $rentalUnits = $units->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+
+    //     // Format building name
+    //     $buildingName = !empty($buildingInfo->BuildingName)
+    //         ? $buildingInfo->BuildingName
+    //         : trim($buildingInfo->StreetNumber . ' ' . $buildingInfo->StreetName);
+
+    //     // Format the response
+    //     return response()->json([
+    //         'success' => true,
+    //         'building' => [
+    //             'name' => $buildingName,
+    //             'address' => trim($buildingInfo->StreetNumber . ' ' . $buildingInfo->StreetName),
+    //             'city' => $buildingInfo->City,
+    //             'state' => $buildingInfo->StateOrProvince,
+    //             'postal_code' => $buildingInfo->PostalCode,
+    //             'unit_count' => $buildingInfo->unit_count,
+    //             'price_range' => [
+    //                 'min' => $buildingInfo->min_price,
+    //                 'max' => $buildingInfo->max_price
+    //             ]
+    //         ],
+    //         'units' => [
+    //             'for_sale' => $salesUnits,
+    //             'for_rent' => $rentalUnits
+    //         ],
+    //         'total_units' => $units->count(),
+    //         'sales_units_count' => $salesUnits->count(),
+    //         'rental_units_count' => $rentalUnits->count(),
+    //     ]);
+    // }
+
     public function buildings(Request $request)
     {
         // Validate request
         $request->validate([
             'street_number' => 'required|string',
+            'type' => 'required|string|in:buy,rent,all',
             'street_name' => 'required|string',
+            'property_type' => 'nullable|string',
+            'property_subtype' => 'nullable|string',
+            'min_price' => 'nullable|numeric',
+            'max_price' => 'nullable|numeric',
+            'min_beds' => 'nullable|integer',
+            'max_beds' => 'nullable|integer',
+            'min_baths' => 'nullable|integer',
+            'max_baths' => 'nullable|integer',
+            'min_living_size' => 'nullable|numeric',
+            'max_living_size' => 'nullable|numeric',
+            'min_land_size' => 'nullable|numeric',
+            'max_land_size' => 'nullable|numeric',
+            'min_year_built' => 'nullable|integer|min:1800|max:2025',
+            'max_year_built' => 'nullable|integer|min:1800|max:2025',
+            'waterfront' => 'nullable|boolean',
+            'waterfront_features' => 'nullable|string',
         ]);
 
         $streetNumber = $request->input('street_number');
         $streetName = $request->input('street_name');
+        $type = $request->input('type', 'buy'); // Default to 'all' if not specified
 
         // Get building information
         $buildingInfo = DB::table('properties')
@@ -952,12 +1122,109 @@ class PropertyApiController extends Controller
             ], 404);
         }
 
-        // Get all units in the building
-        $units = Property::with(['details', 'media'])
+        // Start building the query for units
+        $unitsQuery = Property::with(['details', 'media'])
             ->where('StreetNumber', $streetNumber)
             ->where('StreetName', $streetName)
-            ->where('StandardStatus', 'Active')
-            ->get();
+            ->where('StandardStatus', 'Active');
+
+        // Apply type filter if provided
+        if ($type && $type !== 'all') {
+            switch (strtolower($type)) {
+                case 'buy':
+                    // Properties for sale
+                    $unitsQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+                case 'rent':
+                    // Properties for rent
+                    $unitsQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+            }
+        }
+
+        // Apply property type filter if provided
+        if ($request->filled('property_type')) {
+            $unitsQuery->where('PropertyType', $request->property_type);
+        }
+
+        // Apply property subtype filter if provided
+        if ($request->filled('property_subtype')) {
+            $unitsQuery->where('PropertySubType', $request->property_subtype);
+        }
+
+        // Apply price filters if provided
+        if ($request->filled('min_price')) {
+            $unitsQuery->where('ListPrice', '>=', $request->min_price);
+        }
+        if ($request->filled('max_price')) {
+            $unitsQuery->where('ListPrice', '<=', $request->max_price);
+        }
+
+        // Apply bedroom filters if provided
+        if ($request->filled('min_beds')) {
+            $unitsQuery->where('BedroomsTotal', '>=', $request->min_beds);
+        }
+        if ($request->filled('max_beds')) {
+            $unitsQuery->where('BedroomsTotal', '<=', $request->max_beds);
+        }
+
+        // Apply bathroom filters if provided
+        if ($request->filled('min_baths')) {
+            $unitsQuery->where('BathroomsTotalInteger', '>=', $request->min_baths);
+        }
+        if ($request->filled('max_baths')) {
+            $unitsQuery->where('BathroomsTotalInteger', '<=', $request->max_baths);
+        }
+
+        // Apply living size filters if provided
+        if ($request->filled('min_living_size')) {
+            $unitsQuery->where('LivingArea', '>=', $request->min_living_size);
+        }
+        if ($request->filled('max_living_size')) {
+            $unitsQuery->where('LivingArea', '<=', $request->max_living_size);
+        }
+
+        // Apply land size filters if provided
+        if ($request->filled('min_land_size')) {
+            $unitsQuery->where('LotSizeSquareFeet', '>=', $request->min_land_size);
+        }
+        if ($request->filled('max_land_size')) {
+            $unitsQuery->where('LotSizeSquareFeet', '<=', $request->max_land_size);
+        }
+
+        // Apply year built filters if provided
+        if ($request->filled('min_year_built')) {
+            $unitsQuery->where('YearBuilt', '>=', $request->min_year_built);
+        }
+        if ($request->filled('max_year_built')) {
+            $unitsQuery->where('YearBuilt', '<=', $request->max_year_built);
+        }
+
+        if ($request->has('waterfront') && $request->input('waterfront')) {
+            // Check if the property has WaterfrontYN field set to true in property_details
+            $unitsQuery->whereHas('details', function ($q) {
+                $q->where('WaterfrontYN', true);
+            });
+        }
+
+        if ($request->filled('waterfront_features')) {
+            $waterfrontFeatures = $request->input('waterfront_features');
+            // Split the input by commas if multiple features are provided
+            $featuresArray = explode(',', $waterfrontFeatures);
+            
+            $unitsQuery->whereHas('details', function ($q) use ($featuresArray) {
+                foreach ($featuresArray as $feature) {
+                    $feature = trim($feature);
+                    if (!empty($feature)) {
+                        // Use LIKE query to find the feature in the comma-separated list
+                        $q->where('WaterfrontFeatures', 'LIKE', '%' . $feature . '%');
+                    }
+                }
+            });
+        }
+
+        // Get all filtered units in the building
+        $units = $unitsQuery->get();
 
         // Separate units by type (sale vs rental)
         $salesUnits = $units->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
@@ -989,37 +1256,265 @@ class PropertyApiController extends Controller
             ],
             'total_units' => $units->count(),
             'sales_units_count' => $salesUnits->count(),
-            'rental_units_count' => $rentalUnits->count()
+            'rental_units_count' => $rentalUnits->count(),
         ]);
     }
 
+    // public function places(Request $request)
+    // {
+    //     // Validate request
+    //     $request->validate([
+    //         'city' => 'nullable|string',
+    //         'state' => 'nullable|string',
+    //         'limit' => 'nullable|integer|min:1',
+    //         'page' => 'nullable|integer|min:1',
+    //         'sort_by' => 'nullable|string|in:ListPrice,DateListed,BathroomsTotalInteger,BedroomsTotal,LivingArea,YearBuilt,LotSizeArea',
+    //         'sort_dir' => 'nullable|string|in:asc,desc',
+    //         'property_type' => 'nullable|string',
+    //         'property_subtype' => 'nullable|string',
+    //         'min_price' => 'nullable|numeric',
+    //         'max_price' => 'nullable|numeric',
+    //         'min_beds' => 'nullable|integer',
+    //         'max_beds' => 'nullable|integer',
+    //         'min_baths' => 'nullable|integer',
+    //         'max_baths' => 'nullable|integer',
+    //         'min_living_size' => 'nullable|numeric',
+    //         'max_living_size' => 'nullable|numeric',
+    //         'min_land_size' => 'nullable|numeric',
+    //         'max_land_size' => 'nullable|numeric',
+    //         'min_year_built' => 'nullable|integer|min:1800|max:2025',
+    //         'max_year_built' => 'nullable|integer|min:1800|max:2025',
+    //         'waterfront' => 'nullable|boolean',
+    //         'pets_allowed' => 'nullable|boolean',
+    //         'furnished' => 'nullable|boolean',
+    //         'swimming_pool' => 'nullable|boolean',
+    //         'golf_course' => 'nullable|boolean',
+    //         'tennis_courts' => 'nullable|boolean',
+    //         'gated_community' => 'nullable|boolean',
+    //         'boat_dock' => 'nullable|boolean',
+    //     ]);
+
+    //     $city = $request->input('city');
+    //     $state = $request->input('state');
+    //     $limit = $request->input('limit', 20);
+    //     $page = $request->input('page', 1);
+    //     $sortBy = $request->input('sort_by', 'ListPrice');
+    //     $sortDir = $request->input('sort_dir', 'asc');
+    //     $propertyType = $request->input('property_type');
+    //     $propertySubtype = $request->input('property_subtype'); // New parameter
+
+    //     // Ensure at least one location parameter is provided
+    //     if (empty($city) && empty($state)) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Either city or state parameter is required'
+    //         ], 400);
+    //     }
+
+    //     // Build query
+    //     $query = Property::with(['details', 'amenities', 'media'])->where('StandardStatus', 'Active');
+
+    //     // Apply city filter if provided
+    //     if (!empty($city)) {
+    //         $query->where('City', $city);
+    //     }
+
+    //     // Apply state filter if provided
+    //     if (!empty($state)) {
+    //         $query->where('StateOrProvince', $state);
+    //     }
+
+    //     // Apply property type filter if provided
+    //     if (!empty($propertyType)) {
+    //         $query->where('PropertyType', $propertyType);
+    //     }
+
+    //     // Apply property subtype filter if provided
+    //     if (!empty($propertySubtype)) {
+    //         $query->where('PropertySubType', $propertySubtype);
+    //     }
+
+    //     // Apply price filters if provided
+    //     if ($request->has('min_price')) {
+    //         $query->where('ListPrice', '>=', $request->input('min_price'));
+    //     }
+    //     if ($request->has('max_price')) {
+    //         $query->where('ListPrice', '<=', $request->input('max_price'));
+    //     }
+
+    //     // Apply bedroom filters if provided
+    //     if ($request->has('min_beds')) {
+    //         $query->where('BedroomsTotal', '>=', $request->input('min_beds'));
+    //     }
+    //     if ($request->has('max_beds')) {
+    //         $query->where('BedroomsTotal', '<=', $request->input('max_beds'));
+    //     }
+
+    //     // Apply bathroom filters if provided
+    //     if ($request->has('min_baths')) {
+    //         $query->where('BathroomsTotalInteger', '>=', $request->input('min_baths'));
+    //     }
+    //     if ($request->has('max_baths')) {
+    //         $query->where('BathroomsTotalInteger', '<=', $request->input('max_baths'));
+    //     }
+
+    //     // Apply living size filters if provided
+    //     if ($request->has('min_living_size')) {
+    //         $query->where('LivingArea', '>=', $request->input('min_living_size'));
+    //     }
+    //     if ($request->has('max_living_size')) {
+    //         $query->where('LivingArea', '<=', $request->input('max_living_size'));
+    //     }
+
+    //     // Apply land size filters if provided
+    //     if ($request->has('min_land_size')) {
+    //         $query->where('LotSizeSquareFeet', '>=', $request->input('min_land_size'));
+    //     }
+    //     if ($request->has('max_land_size')) {
+    //         $query->where('LotSizeSquareFeet', '<=', $request->input('max_land_size'));
+    //     }
+
+    //     // Apply year built filters if provided
+    //     if ($request->has('min_year_built')) {
+    //         $query->where('YearBuilt', '>=', $request->input('min_year_built'));
+    //     }
+    //     if ($request->has('max_year_built')) {
+    //         $query->where('YearBuilt', '<=', $request->input('max_year_built'));
+    //     }
+
+    //     // if ($request->has('waterfront') && $request->input('waterfront')) {
+    //     //     // Check if the property has WaterfrontYN field set to true in property_details
+    //     //     $query->whereHas('details', function($q) {
+    //     //         $q->where('WaterfrontYN', true);
+    //     //     });
+    //     // }
+
+    //     // // Pets allowed filter
+    //     // if ($request->has('pets_allowed') && $request->input('pets_allowed')) {
+    //     //     // Check if pets are allowed in property_amenities
+    //     //     $query->whereHas('amenities', function($q) {
+    //     //         $q->where('PetsAllowed', true)
+    //     //           ->orWhere('PetsAllowedYN', true);
+    //     //     });
+    //     // }
+
+    //     // // Furnished filter
+    //     // if ($request->has('furnished') && $request->input('furnished')) {
+    //     //     // Check if property is furnished
+    //     //     $query->whereHas('amenities', function($q) {
+    //     //         $q->where('Furnished', true);
+    //     //     });
+    //     // }
+
+    //     // // Swimming pool filter
+    //     // if ($request->has('swimming_pool') && $request->input('swimming_pool')) {
+    //     //     $query->whereHas('amenities', function($q) {
+    //     //         $q->where('PoolPrivateYN', true)
+    //     //           ->orWhere('CommunityFeatures', 'like', '%Swimming Pool%')
+    //     //           ->orWhere('AssociationAmenities', 'like', '%Swimming Pool%');
+    //     //     });
+    //     // }
+
+    //     // Golf course filter
+    //     // if ($request->has('golf_course') && $request->input('golf_course')) {
+    //     //     $query->whereHas('amenities', function($q) {
+    //     //         $q->where('AssociationAmenities', 'like', '%Golf Course%');
+    //     //     });
+    //     // }
+
+    //     // // Tennis courts filter
+    //     // if ($request->has('tennis_courts') && $request->input('tennis_courts')) {
+    //     //     $query->whereHas('amenities', function($q) {
+    //     //         $q->where('AssociationAmenities', 'like', '%Tennis Court%');
+    //     //     });
+    //     // }
+
+    //     // // Gated community filter
+    //     // if ($request->has('gated_community') && $request->input('gated_community')) {
+    //     //     $query->whereHas('amenities', function($q) {
+    //     //         $q->where('CommunityFeatures', 'like', '%Gated%');
+    //     //     });
+    //     // }
+
+    //     // // Boat dock filter
+    //     // if ($request->has('boat_dock') && $request->input('boat_dock')) {
+    //     //     $query->whereHas('amenities', function($q) {
+    //     //         $q->where('AssociationAmenities', 'like', '%Boat Dock%');
+    //     //     });
+    //     // }
+
+    //     // Apply sorting
+    //     $query->orderBy($sortBy, $sortDir);
+
+    //     // Get paginated results
+    //     $properties = $query->paginate($limit, ['*'], 'page', $page);
+
+    //     // Get location information
+    //     $locationInfo = [
+    //         'city' => $city,
+    //         'state' => $state,
+    //         'total_properties' => $properties->total()
+    //     ];
+
+    //     // Format the response
+    //     return response()->json([
+    //         'success' => true,
+    //         'location' => $locationInfo,
+    //         'properties' => $properties->items(),
+    //         'meta' => [
+    //             'current_page' => $properties->currentPage(),
+    //             'per_page' => $properties->perPage(),
+    //             'total' => $properties->total(),
+    //             'last_page' => $properties->lastPage(),
+    //             'has_more_pages' => $properties->hasMorePages()
+    //         ]
+    //     ]);
+    // }
+
     public function places(Request $request)
     {
-        // dd("jaspreet");
         // Validate request
         $request->validate([
             'city' => 'nullable|string',
             'state' => 'nullable|string',
+            'type' => 'required|string|in:buy,rent,all', // Add type parameter
             'limit' => 'nullable|integer|min:1',
             'page' => 'nullable|integer|min:1',
-            'sort_by' => 'nullable|string|in:ListPrice,DateListed,BathroomsTotalInteger,BedroomsTotal,LivingArea',
+            'sort_by' => 'nullable|string|in:ListPrice,DateListed,BathroomsTotalInteger,BedroomsTotal,LivingArea,YearBuilt,LotSizeArea',
             'sort_dir' => 'nullable|string|in:asc,desc',
             'property_type' => 'nullable|string',
+            'property_subtype' => 'nullable|string',
             'min_price' => 'nullable|numeric',
             'max_price' => 'nullable|numeric',
             'min_beds' => 'nullable|integer',
             'max_beds' => 'nullable|integer',
             'min_baths' => 'nullable|integer',
-            'max_baths' => 'nullable|integer'
+            'max_baths' => 'nullable|integer',
+            'min_living_size' => 'nullable|numeric',
+            'max_living_size' => 'nullable|numeric',
+            'min_land_size' => 'nullable|numeric',
+            'max_land_size' => 'nullable|numeric',
+            'min_year_built' => 'nullable|integer|min:1800|max:2025',
+            'max_year_built' => 'nullable|integer|min:1800|max:2025',
+            'waterfront' => 'nullable|boolean',
+            'pets_allowed' => 'nullable|boolean',
+            'furnished' => 'nullable|boolean',
+            'swimming_pool' => 'nullable|boolean',
+            'golf_course' => 'nullable|boolean',
+            'tennis_courts' => 'nullable|boolean',
+            'gated_community' => 'nullable|boolean',
+            'boat_dock' => 'nullable|boolean',
         ]);
 
         $city = $request->input('city');
         $state = $request->input('state');
-        $limit = $request->input('limit', 20);
+        $type = $request->input('type', 'all'); // Default to 'all' if not specified
+        $limit = $request->input('limit', 12);
         $page = $request->input('page', 1);
         $sortBy = $request->input('sort_by', 'ListPrice');
         $sortDir = $request->input('sort_dir', 'asc');
         $propertyType = $request->input('property_type');
+        $propertySubtype = $request->input('property_subtype');
 
         // Ensure at least one location parameter is provided
         if (empty($city) && empty($state)) {
@@ -1030,8 +1525,21 @@ class PropertyApiController extends Controller
         }
 
         // Build query
-        $query = Property::with(['details', 'media'])
-            ->where('StandardStatus', 'Active');
+        $query = Property::with(['details', 'amenities', 'media'])->where('StandardStatus', 'Active');
+
+        // Apply type filter if provided
+        if ($type && $type !== 'all') {
+            switch (strtolower($type)) {
+                case 'buy':
+                    // Properties for sale
+                    $query->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+                case 'rent':
+                    // Properties for rent
+                    $query->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+            }
+        }
 
         // Apply city filter if provided
         if (!empty($city)) {
@@ -1048,11 +1556,15 @@ class PropertyApiController extends Controller
             $query->where('PropertyType', $propertyType);
         }
 
+        // Apply property subtype filter if provided
+        if (!empty($propertySubtype)) {
+            $query->where('PropertySubType', $propertySubtype);
+        }
+
         // Apply price filters if provided
         if ($request->has('min_price')) {
             $query->where('ListPrice', '>=', $request->input('min_price'));
         }
-
         if ($request->has('max_price')) {
             $query->where('ListPrice', '<=', $request->input('max_price'));
         }
@@ -1061,7 +1573,6 @@ class PropertyApiController extends Controller
         if ($request->has('min_beds')) {
             $query->where('BedroomsTotal', '>=', $request->input('min_beds'));
         }
-
         if ($request->has('max_beds')) {
             $query->where('BedroomsTotal', '<=', $request->input('max_beds'));
         }
@@ -1070,9 +1581,32 @@ class PropertyApiController extends Controller
         if ($request->has('min_baths')) {
             $query->where('BathroomsTotalInteger', '>=', $request->input('min_baths'));
         }
-
         if ($request->has('max_baths')) {
             $query->where('BathroomsTotalInteger', '<=', $request->input('max_baths'));
+        }
+
+        // Apply living size filters if provided
+        if ($request->has('min_living_size')) {
+            $query->where('LivingArea', '>=', $request->input('min_living_size'));
+        }
+        if ($request->has('max_living_size')) {
+            $query->where('LivingArea', '<=', $request->input('max_living_size'));
+        }
+
+        // Apply land size filters if provided
+        if ($request->has('min_land_size')) {
+            $query->where('LotSizeSquareFeet', '>=', $request->input('min_land_size'));
+        }
+        if ($request->has('max_land_size')) {
+            $query->where('LotSizeSquareFeet', '<=', $request->input('max_land_size'));
+        }
+
+        // Apply year built filters if provided
+        if ($request->has('min_year_built')) {
+            $query->where('YearBuilt', '>=', $request->input('min_year_built'));
+        }
+        if ($request->has('max_year_built')) {
+            $query->where('YearBuilt', '<=', $request->input('max_year_built'));
         }
 
         // Apply sorting

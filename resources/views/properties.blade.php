@@ -13,11 +13,12 @@
             <form id="property-search-form" action="{{ route('properties') }}" method="GET"
                 class="flex flex-col sm:flex-row gap-2">
                 <div class="flex-grow relative">
-                    <input type="text" id="mapbox-search" name="search" placeholder="Search by address, city, postal code..."
-                    autocomplete="off"
-                    value="{{ request('search') }}"
+                    <input type="text" id="mapbox-search" name="search"
+                        placeholder="Search by address, city, postal code..." autocomplete="off"
+                        value="{{ request('search') }}"
                         class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <div id="mapbox-results" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg hidden"></div>
+                    <div id="mapbox-results"
+                        class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg hidden"></div>
                 </div>
                 <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
                     Search
@@ -35,11 +36,11 @@
                                 <tr>
                                     <th class="px-4 py-2">Listing Key</th>
                                     <th class="px-4 py-2">
-                                        <a href="{{ route('properties', array_merge(request()->query(), ['sort_by' => 'PropertyType', 'sort_direction' => (request('sort_by') == 'PropertyType' && request('sort_direction') == 'asc') ? 'desc' : 'asc'])) }}"
-                                           class="text-gray-700 hover:underline">
+                                        <a href="{{ route('properties', array_merge(request()->query(), ['sort_by' => 'PropertyType', 'sort_direction' => request('sort_by') == 'PropertyType' && request('sort_direction') == 'asc' ? 'desc' : 'asc'])) }}"
+                                            class="text-gray-700 hover:underline">
                                             Type
-                                            @if(request('sort_by') == 'PropertyType')
-                                                @if(request('sort_direction') == 'asc')
+                                            @if (request('sort_by') == 'PropertyType')
+                                                @if (request('sort_direction') == 'asc')
                                                     <span>&#x2191;</span> <!-- Ascending arrow -->
                                                 @else
                                                     <span>&#x2193;</span> <!-- Descending arrow -->
@@ -52,11 +53,11 @@
                                     <th class="px-4 py-2">Baths</th>
                                     <th class="px-4 py-2">Area (sqft)</th>
                                     <th class="px-4 py-2">
-                                        <a href="{{ route('properties', array_merge(request()->query(), ['sort_by' => 'UnitNumber', 'sort_direction' => (request('sort_by') == 'UnitNumber' && request('sort_direction') == 'asc') ? 'desc' : 'asc'])) }}"
-                                           class="text-gray-700 hover:underline">
+                                        <a href="{{ route('properties', array_merge(request()->query(), ['sort_by' => 'UnitNumber', 'sort_direction' => request('sort_by') == 'UnitNumber' && request('sort_direction') == 'asc' ? 'desc' : 'asc'])) }}"
+                                            class="text-gray-700 hover:underline">
                                             Unit Number
-                                            @if(request('sort_by') == 'UnitNumber')
-                                                @if(request('sort_direction') == 'asc')
+                                            @if (request('sort_by') == 'UnitNumber')
+                                                @if (request('sort_direction') == 'asc')
                                                     <span>&#x2191;</span> <!-- Ascending arrow -->
                                                 @else
                                                     <span>&#x2193;</span> <!-- Descending arrow -->
@@ -85,7 +86,10 @@
                                         <td class="px-4 py-2">{{ $property->LivingArea }}</td>
                                         <td class="px-4 py-2">{{ $property->UnitNumber }}</td>
                                         <td class="px-4 py-2">
-                                            {{ $property->UnparsedAddress }}
+                                            {{ $property->StreetNumber ?? '' }} {{ $property->StreetName ?? '' }}
+                                            {{ $property->StreetSuffix ? $property->StreetSuffix . ',' : '' }}
+                                            {{ $property->City ? $property->City . ',' : '' }} {{ $property->StateOrProvince ?? '' }}
+                                            {{ $property->PostalCode ?? '' }}
                                         </td>
                                         <td class="px-4 py-2">{{ $property->City }}</td>
                                         <td class="px-4 py-2">{{ $property->StandardStatus }}</td>
@@ -116,147 +120,103 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Replace with your Mapbox access token
-            const mapboxToken = 'pk.eyJ1IjoiamFzcC1yZWV0IiwiYSI6ImNtOWxiaXluczAyeHUybHIxc2sycHVsNjQifQ.NW350JyVU-z-cMkzgdCrNw';
-            
+            const mapboxToken =
+                'pk.eyJ1IjoiamFzcC1yZWV0IiwiYSI6ImNtOWxiaXluczAyeHUybHIxc2sycHVsNjQifQ.NW350JyVU-z-cMkzgdCrNw';
+
             if (!mapboxToken) {
                 console.error('Mapbox access token is not set');
                 return;
             }
-            
+
             const searchInput = document.getElementById('mapbox-search');
             const resultsContainer = document.getElementById('mapbox-results');
             const searchForm = document.getElementById('property-search-form');
-            
+
             let debounceTimer;
-            
+
             searchInput.addEventListener('input', function() {
                 clearTimeout(debounceTimer);
-                
+
                 const query = this.value;
-                
-                if (query.length < 2) {
+
+                if (query.length < 1) { // Changed from 2 to 1
                     resultsContainer.innerHTML = '';
                     resultsContainer.classList.add('hidden');
                     return;
                 }
-                
+
                 debounceTimer = setTimeout(() => {
                     // Geocoding API endpoint - focus on places and regions for city/state searches
-                    const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=us&types=place,region,district,locality,neighborhood,address,postcode&limit=5`;
-                    
+                    const endpoint =
+                        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&country=us&types=place,region,district,locality,neighborhood,address,postcode&limit=5`;
+
                     fetch(endpoint)
                         .then(response => response.json())
                         .then(data => {
                             resultsContainer.innerHTML = '';
-                            
+
                             if (data.features && data.features.length > 0) {
-                                // Create a heading for Mapbox results
-                                // const heading = document.createElement('div');
-                                // heading.className = 'p-2 bg-gray-100 font-semibold text-sm';
-                                // heading.textContent = 'Location Suggestions';
-                                // resultsContainer.appendChild(heading);
-                                
-                                // data.features.forEach(feature => {
-                                //     // Extract components from the place name
-                                //     const components = feature.place_name.split(', ');
-                                    
-                                //     const item = document.createElement('div');
-                                //     item.className = 'p-2 hover:bg-gray-100 cursor-pointer';
-                                    
-                                //     // Format the display to highlight the main part
-                                //     if (components.length > 1) {
-                                //         const mainPart = document.createElement('span');
-                                //         mainPart.className = 'font-medium';
-                                //         mainPart.textContent = components[0];
-                                        
-                                //         const secondaryPart = document.createElement('span');
-                                //         secondaryPart.className = 'text-gray-500 ml-1';
-                                //         secondaryPart.textContent = components.slice(1).join(', ');
-                                        
-                                //         item.appendChild(mainPart);
-                                //         item.appendChild(secondaryPart);
-                                //     } else {
-                                //         item.textContent = feature.place_name;
-                                //     }
-                                    
-                                //     // Store the full place name as a data attribute
-                                //     item.dataset.placeName = feature.place_name;
-                                    
-                                //     // Store context data for more precise searching
-                                //     if (feature.context) {
-                                //         const contextData = {};
-                                //         feature.context.forEach(ctx => {
-                                //             const id = ctx.id.split('.')[0];
-                                //             contextData[id] = ctx.text;
-                                //         });
-                                        
-                                //         if (feature.place_type[0] === 'place') {
-                                //             contextData.city = feature.text;
-                                //         } else if (feature.place_type[0] === 'region') {
-                                //             contextData.state = feature.text;
-                                //         }
-                                        
-                                //         item.dataset.context = JSON.stringify(contextData);
-                                //     }
-                                    
-                                //     item.addEventListener('click', function() {
-                                //         searchInput.value = this.dataset.placeName;
-                                //         resultsContainer.classList.add('hidden');
-                                        
-                                //         // Optional: Submit the form immediately
-                                //         // searchForm.submit();
-                                //     });
-                                    
-                                //     resultsContainer.appendChild(item);
-                                // });
-                                
-                                // Now fetch property-specific suggestions from your database
                                 fetch(`/property-suggestions?q=${encodeURIComponent(query)}`)
                                     .then(response => response.json())
                                     .then(propertyData => {
                                         if (propertyData.length > 0) {
                                             // Add a divider
                                             const divider = document.createElement('div');
-                                            divider.className = 'border-t border-gray-200 my-1';
+                                            divider.className =
+                                                'border-t border-gray-200 my-1';
                                             resultsContainer.appendChild(divider);
-                                            
+
                                             // Add a heading for property results
                                             const heading = document.createElement('div');
-                                            heading.className = 'p-2 bg-gray-100 font-semibold text-sm';
+                                            heading.className =
+                                                'p-2 bg-gray-100 font-semibold text-sm';
                                             heading.textContent = 'Properties';
                                             resultsContainer.appendChild(heading);
-                                            
+
                                             propertyData.forEach(property => {
-                                                const item = document.createElement('div');
-                                                item.className = 'p-2 hover:bg-gray-100 cursor-pointer';
-                                                
-                                                const address = document.createElement('span');
+                                                const item = document.createElement(
+                                                    'div');
+                                                item.className =
+                                                    'p-2 hover:bg-gray-100 cursor-pointer';
+
+                                                const address = document
+                                                    .createElement('span');
                                                 address.className = 'font-medium';
-                                                address.textContent = property.UnparsedAddress;
-                                                
-                                                const cityState = document.createElement('span');
-                                                cityState.className = 'text-gray-500 ml-1';
-                                                cityState.textContent = `${property.City}, ${property.StateOrProvince}`;
-                                                
+                                                address.textContent = property
+                                                    .UnparsedAddress;
+
+                                                const cityState = document
+                                                    .createElement('span');
+                                                cityState.className =
+                                                    'text-gray-500 ml-1';
+                                                cityState.textContent =
+                                                    `${property.City}, ${property.StateOrProvince}`;
+
                                                 item.appendChild(address);
                                                 item.appendChild(cityState);
-                                                
-                                                item.addEventListener('click', function() {
-                                                    searchInput.value = `${property.UnparsedAddress}, ${property.City}, ${property.StateOrProvince}`;
-                                                    resultsContainer.classList.add('hidden');
-                                                    
-                                                    // Optional: Submit the form immediately
-                                                    // searchForm.submit();
-                                                });
-                                                
+
+                                                item.addEventListener('click',
+                                                    function() {
+                                                        searchInput.value =
+                                                            `${property.UnparsedAddress}, ${property.City}, ${property.StateOrProvince}`;
+                                                        resultsContainer
+                                                            .classList.add(
+                                                                'hidden');
+
+                                                        // Optional: Submit the form immediately
+                                                        // searchForm.submit();
+                                                    });
+
                                                 resultsContainer.appendChild(item);
                                             });
                                         }
-                                        
+
                                         resultsContainer.classList.remove('hidden');
                                     })
                                     .catch(error => {
-                                        console.error('Error fetching property suggestions:', error);
+                                        console.error(
+                                            'Error fetching property suggestions:',
+                                            error);
                                         resultsContainer.classList.remove('hidden');
                                     });
                             } else {
@@ -268,14 +228,14 @@
                         });
                 }, 300);
             });
-            
+
             // Hide results when clicking outside
             document.addEventListener('click', function(e) {
                 if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
                     resultsContainer.classList.add('hidden');
                 }
             });
-            
+
             // Show results when focusing on input if there's content
             searchInput.addEventListener('focus', function() {
                 if (this.value.length >= 2 && resultsContainer.children.length > 0) {

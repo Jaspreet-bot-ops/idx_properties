@@ -83,6 +83,8 @@ class UpdateTrestleProperties extends Command
             // Process properties in batches
             $this->processBatches($lookbackTime, $debug, $geocode);
 
+            $this->info('Property update process completed. Now checking for deleted properties...');
+            $this->syncAndRemoveDeletedProperties();
             return 0;
         } catch (\Exception $e) {
             $this->error('An error occurred: ' . $e->getMessage());
@@ -430,309 +432,6 @@ class UpdateTrestleProperties extends Command
             return null;
         }
     }
-
-    /**
-     * Fetch properties updated since the given timestamp
-     * 
-     * @param string $timestamp ISO 8601 timestamp
-     * @return array Array of property data
-     */
-    // protected function fetchUpdatedProperties($timestamp)
-    // {
-    //     $this->info("Fetching properties updated since {$timestamp}...");
-    //     $maxRetries = 3;
-    //     $retryCount = 0;
-    //     $allProperties = [];
-    //     $skip = 0;
-    //     $batchSize = 200;
-    //     $morePropertiesAvailable = true;
-
-    //     while ($morePropertiesAvailable && $retryCount <= $maxRetries) {
-    //         try {
-    //             // Build the OData query
-    //             $url = $this->apiBaseUrl . '/odata/Property';
-    //             $query = [
-    //                 '$top' => $batchSize,
-    //                 '$skip' => $skip,
-    //                 '$expand' => 'Media',
-    //                 '$filter' => "ModificationTimestamp gt {$timestamp}",
-    //                 '$orderby' => 'ModificationTimestamp asc',
-    //                 '$count' => 'true'
-    //             ];
-
-    //             $response = Http::timeout(120)
-    //                 ->withToken($this->accessToken)
-    //                 ->withHeaders([
-    //                     'Accept' => 'application/json'
-    //                 ])
-    //                 ->get($url, $query);
-
-    //             if (!$response->successful()) {
-    //                 $this->error('API request failed: ' . $response->status() . ' ' . $response->body());
-    //                 Log::error('Trestle API request failed', [
-    //                     'status' => $response->status(),
-    //                     'body' => $response->body()
-    //                 ]);
-    //                 return [];
-    //             }
-
-    //             $data = $response->json();
-
-    //             if (!isset($data['value']) || !is_array($data['value'])) {
-    //                 $this->error('API response does not contain property data.');
-    //                 Log::error('Trestle API response missing property data', [
-    //                     'response' => $data
-    //                 ]);
-    //                 return [];
-    //             }
-
-    //             $properties = $data['value'];
-    //             $fetchedCount = count($properties);
-
-    //             if ($fetchedCount > 0) {
-    //                 $allProperties = array_merge($allProperties, $properties);
-    //                 $skip += $fetchedCount;
-    //                 $this->info("Fetched {$fetchedCount} properties (total: " . count($allProperties) . ")");
-    //             }
-
-    //             // If we got fewer properties than requested, we've reached the end
-    //             if ($fetchedCount < $batchSize) {
-    //                 $morePropertiesAvailable = false;
-    //             }
-
-    //             // Small delay between requests
-    //             if ($morePropertiesAvailable) {
-    //                 sleep(1);
-    //             }
-    //         } catch (\Exception $e) {
-    //             $retryCount++;
-
-    //             if ($retryCount > $maxRetries) {
-    //                 $this->error('Exception fetching properties: ' . $e->getMessage());
-    //                 Log::error('Exception fetching properties from Trestle API', [
-    //                     'exception' => $e->getMessage()
-    //                 ]);
-    //                 break;
-    //             }
-
-    //             $this->warn("Request failed, retrying ({$retryCount}/{$maxRetries})...");
-    //             sleep(5); // Wait 5 seconds before retrying
-    //         }
-    //     }
-
-    //     return $allProperties;
-    // }
-
-
-    // protected function fetchUpdatedProperties($timestamp)
-    // {
-    //     $this->info("Fetching properties updated since {$timestamp}...");
-    //     $maxRetries = 3;
-    //     $skip = 0;
-    //     $batchSize = 200;
-    //     $morePropertiesAvailable = true;
-    //     $totalProcessed = 0;
-    //     $totalInserted = 0;
-    //     $totalUpdated = 0;
-    //     $totalGeocoded = 0;
-    //     $totalErrors = 0;
-    //     $debug = $this->option('debug');
-    //     $geocode = $this->option('geocode');
-
-    //     while ($morePropertiesAvailable) {
-    //         try {
-    //             // Build the OData query
-    //             $url = $this->apiBaseUrl . '/odata/Property';
-    //             $query = [
-    //                 '$top' => $batchSize,
-    //                 '$skip' => $skip,
-    //                 '$expand' => 'Media',
-    //                 '$filter' => "ModificationTimestamp gt {$timestamp}",
-    //                 '$orderby' => 'ModificationTimestamp asc',
-    //                 '$count' => 'true'
-    //             ];
-
-    //             $response = Http::timeout(120)
-    //                 ->withToken($this->accessToken)
-    //                 ->withHeaders([
-    //                     'Accept' => 'application/json'
-    //                 ])
-    //                 ->get($url, $query);
-
-    //             if (!$response->successful()) {
-    //                 $this->error('API request failed: ' . $response->status() . ' ' . $response->body());
-    //                 Log::error('Trestle API request failed', [
-    //                     'status' => $response->status(),
-    //                     'body' => $response->body()
-    //                 ]);
-    //                 break;
-    //             }
-
-    //             $data = $response->json();
-
-    //             if (!isset($data['value']) || !is_array($data['value'])) {
-    //                 $this->error('API response does not contain property data.');
-    //                 Log::error('Trestle API response missing property data', [
-    //                     'response' => $data
-    //                 ]);
-    //                 break;
-    //             }
-
-    //             $properties = $data['value'];
-    //             $fetchedCount = count($properties);
-
-    //             if ($fetchedCount > 0) {
-    //                 $skip += $fetchedCount;
-    //                 $this->info("Fetched {$fetchedCount} properties (total: {$skip})");
-
-    //                 // Process this batch immediately
-    //                 $batchResults = $this->processPropertyBatch($properties, $debug, $geocode);
-    //                 $totalProcessed += $batchResults['processed'];
-    //                 $totalInserted += $batchResults['inserted'];
-    //                 $totalUpdated += $batchResults['updated'];
-    //                 $totalGeocoded += $batchResults['geocoded'];
-    //                 $totalErrors += $batchResults['errors'];
-
-    //                 // Free up memory
-    //                 unset($properties);
-    //                 unset($data);
-    //                 gc_collect_cycles();
-    //             }
-
-    //             // If we got fewer properties than requested, we've reached the end
-    //             if ($fetchedCount < $batchSize) {
-    //                 $morePropertiesAvailable = false;
-    //             }
-
-    //             // Small delay between requests
-    //             if ($morePropertiesAvailable) {
-    //                 sleep(1);
-    //             }
-    //         } catch (\Exception $e) {
-    //             $this->error('Exception fetching properties: ' . $e->getMessage());
-    //             Log::error('Exception fetching properties from Trestle API', [
-    //                 'exception' => $e->getMessage()
-    //             ]);
-    //             break;
-    //         }
-    //     }
-
-    //     $this->info("Processing completed:");
-    //     $this->info("- Total processed: $totalProcessed");
-    //     $this->info("- Newly inserted: $totalInserted");
-    //     $this->info("- Updated: $totalUpdated");
-    //     $this->info("- Geocoded: $totalGeocoded");
-    //     $this->info("- Errors: $totalErrors");
-
-    //     return true;
-    // }
-
-    // Add this new method to process each batch
-    // protected function processPropertyBatch($properties, $debug, $geocode)
-    // {
-    //     $processed = 0;
-    //     $errors = 0;
-    //     $inserted = 0;
-    //     $updated = 0;
-    //     $geocoded = 0;
-
-    //     foreach ($properties as $propertyData) {
-    //         try {
-    //             DB::beginTransaction();
-
-    //             $listingKey = $propertyData['ListingKey'] ?? null;
-
-    //             if (!$listingKey) {
-    //                 throw new \Exception('Property data missing ListingKey');
-    //             }
-
-    //             // Check if property already exists
-    //             $property = Property::where('ListingKey', $listingKey)->first();
-    //             $exists = $property !== null;
-
-    //             // If property doesn't exist, create a new one
-    //             if (!$exists) {
-    //                 $property = new Property();
-    //                 $inserted++;
-    //             } else {
-    //                 $updated++;
-    //             }
-
-    //             // Map property data to model
-    //             $this->mapPropertyData($property, $propertyData);
-
-    //             // Increment the updated counter for the property
-    //             $property->updated = ($property->updated ?? 0) + 1;
-
-    //             // Geocode the property address if option is enabled
-    //             if ($geocode && $property->UnparsedAddress) {
-    //                 $geocodeData = $this->getGeocodeData($property);
-    //                 if ($geocodeData) {
-    //                     $property->Latitude = $geocodeData['lat'];
-    //                     $property->Longitude = $geocodeData['lng'];
-    //                     $property->Country = $geocodeData['country'];
-    //                     $geocoded++;
-
-    //                     if ($debug) {
-    //                         $this->info("Geocoded address for property: " . $listingKey);
-    //                     }
-    //                 }
-    //             }
-
-    //             $property->save();
-
-    //             // Delete existing related data to avoid duplicates or stale data
-    //             if ($exists) {
-    //                 $property->details()->delete();
-    //                 $property->amenities()->delete();
-    //                 $property->media()->delete();
-    //                 $property->schools()->delete();
-    //                 $property->financialDetails()->delete();
-    //             }
-
-    //             $this->savePropertyDetails($property, $propertyData);
-    //             $this->savePropertyAmenities($property, $propertyData);
-    //             $this->savePropertyMedia($property, $propertyData['Media'] ?? []);
-    //             $this->savePropertySchools($property, $propertyData);
-    //             $this->savePropertyFinancialDetails($property, $propertyData);
-
-    //             DB::commit();
-    //             $processed++;
-
-    //             if ($debug) {
-    //                 $this->info("Successfully processed property: " . $listingKey);
-    //             }
-    //         } catch (\Exception $e) {
-    //             DB::rollBack();
-    //             $errors++;
-
-    //             if ($debug) {
-    //                 $this->error('Error processing property: ' . $e->getMessage());
-    //                 $this->error('Property: ' . ($propertyData['ListingKey'] ?? 'unknown'));
-    //             }
-
-    //             Log::error('Error processing property: ' . $e->getMessage(), [
-    //                 'property' => $propertyData['ListingKey'] ?? 'unknown',
-    //                 'exception' => $e
-    //             ]);
-    //         }
-    //     }
-
-    //     $this->info("Batch processing completed:");
-    //     $this->info("- Processed: $processed");
-    //     $this->info("- Inserted: $inserted");
-    //     $this->info("- Updated: $updated");
-    //     $this->info("- Geocoded: $geocoded");
-    //     $this->info("- Errors: $errors");
-
-    //     return [
-    //         'processed' => $processed,
-    //         'inserted' => $inserted,
-    //         'updated' => $updated,
-    //         'geocoded' => $geocoded,
-    //         'errors' => $errors
-    //     ];
-    // }
 
     /**
      * Map property data to the Property model
@@ -1090,5 +789,147 @@ class UpdateTrestleProperties extends Command
             'lng' => $location[0],
             'country' => $country,
         ];
+    }
+
+    /**
+     * Synchronize database properties with Trestle API and remove deleted properties
+     * 
+     * @return void
+     */
+    protected function syncAndRemoveDeletedProperties()
+    {
+        $this->info('Starting property synchronization to identify deleted properties...');
+
+        try {
+            // Get all ListingKeys from the database
+            $dbListingKeys = Property::pluck('ListingKey')->toArray();
+            $this->info('Found ' . count($dbListingKeys) . ' properties in the database');
+
+            if (empty($dbListingKeys)) {
+                $this->info('No properties in database to check.');
+                return;
+            }
+
+            // Process in chunks to avoid overwhelming the API
+            $chunks = array_chunk($dbListingKeys, 100);
+            $activeListingKeys = [];
+            $deletedCount = 0;
+
+            foreach ($chunks as $index => $chunk) {
+                $this->info('Processing chunk ' . ($index + 1) . ' of ' . count($chunks));
+
+                // Build filter for the current chunk of ListingKeys
+                $filterConditions = [];
+                foreach ($chunk as $listingKey) {
+                    $filterConditions[] = "ListingKey eq '{$listingKey}'";
+                }
+
+                $filter = '(' . implode(' or ', $filterConditions) . ')';
+
+                // Query Trestle API to check which properties still exist
+                $url = $this->apiBaseUrl . '/odata/Property';
+                $query = [
+                    '$select' => 'ListingKey',
+                    '$filter' => $filter,
+                    '$count' => 'true'
+                ];
+
+                $response = Http::timeout(120)
+                    ->withToken($this->accessToken)
+                    ->withHeaders([
+                        'Accept' => 'application/json'
+                    ])
+                    ->get($url, $query);
+
+                if (!$response->successful()) {
+                    $this->error('API request failed: ' . $response->status() . ' ' . $response->body());
+                    Log::error('Trestle API request failed during sync', [
+                        'status' => $response->status(),
+                        'body' => $response->body()
+                    ]);
+                    continue;
+                }
+
+                $data = $response->json();
+
+                if (!isset($data['value']) || !is_array($data['value'])) {
+                    $this->error('API response does not contain property data.');
+                    Log::error('Trestle API response missing property data during sync', [
+                        'response' => $data
+                    ]);
+                    continue;
+                }
+
+                // Extract ListingKeys from the response
+                $apiListingKeys = array_column($data['value'], 'ListingKey');
+                $activeListingKeys = array_merge($activeListingKeys, $apiListingKeys);
+
+                // Small delay between chunks
+                if ($index < count($chunks) - 1) {
+                    sleep(1);
+                }
+            }
+
+            // Find ListingKeys that exist in the database but not in the API
+            $deletedListingKeys = array_diff($dbListingKeys, $activeListingKeys);
+
+            if (empty($deletedListingKeys)) {
+                $this->info('No deleted properties found.');
+                return;
+            }
+
+            $this->info('Found ' . count($deletedListingKeys) . ' properties that have been deleted from Trestle.');
+
+            // Confirm deletion if not in force mode
+            if (!$this->option('force') && !$this->confirm('Do you want to remove these properties from the database?')) {
+                $this->info('Operation cancelled by user.');
+                return;
+            }
+
+            // Process deletions in chunks to avoid memory issues
+            $deletionChunks = array_chunk($deletedListingKeys, 50);
+
+            foreach ($deletionChunks as $deletionChunk) {
+                try {
+                    DB::beginTransaction();
+
+                    // Get the property IDs for this chunk
+                    $propertyIds = Property::whereIn('ListingKey', $deletionChunk)->pluck('id')->toArray();
+
+                    // Delete related records first
+                    PropertyDetail::whereIn('property_id', $propertyIds)->delete();
+                    PropertyAmenity::whereIn('property_id', $propertyIds)->delete();
+                    PropertyMedia::whereIn('property_id', $propertyIds)->delete();
+                    PropertySchool::whereIn('property_id', $propertyIds)->delete();
+                    PropertyFinancialDetail::whereIn('property_id', $propertyIds)->delete();
+
+                    // Delete the properties
+                    $deleted = Property::whereIn('ListingKey', $deletionChunk)->delete();
+                    $deletedCount += $deleted;
+
+                    DB::commit();
+
+                    // Log the deleted listing keys
+                    Log::info("Properties deleted from database", [
+                        'count' => $deleted,
+                        'listing_keys' => $deletionChunk
+                    ]);
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    $this->error('Error deleting properties: ' . $e->getMessage());
+                    Log::error('Error deleting properties during sync', [
+                        'exception' => $e->getMessage(),
+                        'listing_keys' => $deletionChunk
+                    ]);
+                }
+            }
+
+            $this->info("Successfully removed {$deletedCount} properties that no longer exist in Trestle.");
+        } catch (\Exception $e) {
+            $this->error('Exception during property synchronization: ' . $e->getMessage());
+            Log::error('Exception during property synchronization', [
+                'exception' => $e->getMessage()
+            ]);
+        }
     }
 }

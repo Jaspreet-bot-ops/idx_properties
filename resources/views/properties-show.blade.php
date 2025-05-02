@@ -291,6 +291,11 @@
                                 </span>
                             </div>
                         </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">BuildingName</div>
+                            <div class="admin-data-value">{{ $property->BuildingName }}</div>
+                        </div>
                         
                         <div class="admin-data-item">
                             <div class="admin-data-label">List Price</div>
@@ -301,13 +306,69 @@
                             <div class="admin-data-label">Listing Agent</div>
                             <div class="admin-data-value">{{ $property->ListAgentFullName }}</div>
                         </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Street Number</div>
+                            <div class="admin-data-value">
+                                {{ $property->StreetNumber }} 
+                            </div>
+                        </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">StreetDirPrefix</div>
+                            <div class="admin-data-value">
+                                {{ $property->StreetDirPrefix }}
+                            </div>
+                        </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">StreetName</div>
+                            <div class="admin-data-value">
+                                {{ $property->StreetName }}
+                            </div>
+                        </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">StreetSuffix</div>
+                            <div class="admin-data-value">
+                                {{ $property->StreetSuffix }}
+                            </div>
+                        </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">City</div>
+                            <div class="admin-data-value">
+                                {{ $property->City }}
+                            </div>
+                        </div>
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">StateorProvince</div>
+                            <div class="admin-data-value">
+                                {{ $property->StateOrProvince }} 
+                            </div>
+                        </div>
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">PostalCode</div>
+                            <div class="admin-data-value">
+                                {{ $property->PostalCode }}
+                            </div>
+                        </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Country</div>
+                            <div class="admin-data-value">{{ $property->Country ?? 'N/A' }}</div>
+                        </div>
                         
                         <div class="admin-data-item">
-                            <div class="admin-data-label">Address</div>
+                            <div class="admin-data-label">UnparsedAddress</div>
                             <div class="admin-data-value">
-                                {{ $property->StreetNumber }} {{ $property->StreetName }} {{ $property->StreetSuffix }}, 
-                                {{ $property->City }}, {{ $property->StateOrProvince }} {{ $property->PostalCode }}
+                                {{ $property->UnparsedAddress }}
                             </div>
+                        </div>
+
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Coordinates</div>
+                            <div class="admin-data-value">{{ $property->Latitude ?? 'N/A' }}, {{ $property->Longitude ?? 'N/A' }}</div>
                         </div>
 
                         <div class="admin-data-item">
@@ -330,16 +391,6 @@
                         <div class="admin-data-item">
                             <div class="admin-data-label">Living Area</div>
                             <div class="admin-data-value">{{ number_format($property->LivingArea) }} sqft</div>
-                        </div>
-                        
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Coordinates</div>
-                            <div class="admin-data-value">{{ $property->Latitude ?? 'N/A' }}, {{ $property->Longitude ?? 'N/A' }}</div>
-                        </div>
-                        
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Country</div>
-                            <div class="admin-data-value">{{ $property->Country ?? 'N/A' }}</div>
                         </div>
                         
                         <div class="admin-data-item">
