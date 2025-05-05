@@ -533,123 +533,6 @@ class PropertyApiController extends Controller
         ]);
     }
 
-    // public function getDevelopments(Request $request)
-    // {
-    //     // Start with the base query to get developments/buildings
-    //     $query = Property::with([
-    //         'details',
-    //         'media'
-    //     ])
-    //         ->where('StandardStatus', 'Active')
-    //         ->where(function ($q) {
-    //             $q->where('YearBuilt', '>', 2024)
-    //                 ->orWhere('PropertySubType', 'Condominium');
-    //         });
-
-    //     // Group by address or development name
-    //     $query->select(
-    //         'properties.*',
-    //         DB::raw('COUNT(*) as unit_count'),
-    //         DB::raw('MIN(ListPrice) as min_price'),
-    //         DB::raw('MAX(ListPrice) as max_price')
-    //     )
-    //         ->groupBy('UnparsedAddress') // Or use ProjectName or another field that identifies the development
-    //         ->havingRaw('COUNT(*) >= 1');
-
-    //     // Apply ordering if requested
-    //     if ($request->has('orderby')) {
-    //         $orderBy = $request->input('orderby');
-    //         $direction = 'asc';
-
-    //         if (strpos($orderBy, ' desc') !== false) {
-    //             $orderBy = str_replace(' desc', '', $orderBy);
-    //             $direction = 'desc';
-    //         }
-
-    //         // Apply ordering
-    //         $query->orderBy($orderBy, $direction);
-    //     } else {
-    //         // Default ordering
-    //         $query->orderByRaw("CASE WHEN PropertySubType = 'Condominium' THEN 0 ELSE 1 END")
-    //             ->orderBy('YearBuilt', 'desc');
-    //     }
-
-    //     // Get the total count before pagination
-    //     $totalCount = $query->count(DB::raw('DISTINCT UnparsedAddress'));
-
-    //     // Handle pagination parameters
-    //     $limit = $request->input('limit', 10);
-    //     $page = $request->input('page', 1);
-    //     $offset = ($page - 1) * $limit;
-
-    //     // Apply limit and offset
-    //     $developments = $query->skip($offset)->take($limit)->get();
-
-    //     // Format the response
-    //     return response()->json([
-    //         'developments' => $developments,
-    //         'meta' => [
-    //             'current_page' => (int)$page,
-    //             'per_page' => (int)$limit,
-    //             'total' => $totalCount,
-    //             'has_more' => ($offset + $limit) < $totalCount
-    //         ]
-    //     ]);
-    // }
-
-    // public function getDevelopmentUnits(Request $request, $developmentId)
-    // {
-    //     // Get the development first to extract the address or identifier
-    //     $development = Property::findOrFail($developmentId);
-    //     $developmentAddress = $development->UnparsedAddress;
-
-    //     // Get all units in this development
-    //     $query = Property::with([
-    //         'details',
-    //         'amenities',
-    //         'media',
-    //         'schools',
-    //         'financialDetails'
-    //     ])
-    //         ->where('UnparsedAddress', $developmentAddress)
-    //         ->where('StandardStatus', 'Active');
-
-    //     // Apply ordering
-    //     if ($request->has('orderby')) {
-    //         $orderBy = $request->input('orderby');
-    //         $direction = 'asc';
-
-    //         if (strpos($orderBy, ' desc') !== false) {
-    //             $orderBy = str_replace(' desc', '', $orderBy);
-    //             $direction = 'desc';
-    //         }
-
-    //         $query->orderBy($orderBy, $direction);
-    //     } else {
-    //         // Default ordering by price
-    //         $query->orderBy('ListPrice', 'asc');
-    //     }
-
-    //     // Handle pagination
-    //     $limit = $request->input('limit', 20);
-    //     $page = $request->input('page', 1);
-    //     $offset = ($page - 1) * $limit;
-
-    //     $totalCount = $query->count();
-    //     $units = $query->skip($offset)->take($limit)->get();
-
-    //     return response()->json([
-    //         'development' => $development,
-    //         'units' => $units,
-    //         'meta' => [
-    //             'current_page' => (int)$page,
-    //             'per_page' => (int)$limit,
-    //             'total' => $totalCount,
-    //             'has_more' => ($offset + $limit) < $totalCount
-    //         ]
-    //     ]);
-    // }
-
     public function searchProperties(Request $request)
     {
         $query = Property::with([
@@ -897,18 +780,238 @@ class PropertyApiController extends Controller
         return $states[$state] ?? $state;
     }
 
-    public function propertyDetails($id)
+    public function propertyDetails($id, Request $request)
     {
-        // Find the property with all its relationships
-        $property = Property::with([
+        // Validate any filter parameters if provided
+        $request->validate([
+            'type' => 'nullable|string|in:buy,rent,all',
+            'property_type' => 'nullable|string',
+            'property_subtype' => 'nullable|string',
+            'min_price' => 'nullable|numeric',
+            'max_price' => 'nullable|numeric',
+            'min_beds' => 'nullable|integer',
+            'max_beds' => 'nullable|integer',
+            'min_baths' => 'nullable|integer',
+            'max_baths' => 'nullable|integer',
+            'min_living_size' => 'nullable|numeric',
+            'max_living_size' => 'nullable|numeric',
+            'min_land_size' => 'nullable|numeric',
+            'max_land_size' => 'nullable|numeric',
+            'min_year_built' => 'nullable|integer|min:1800|max:2025',
+            'max_year_built' => 'nullable|integer|min:1800|max:2025',
+            'waterfront' => 'nullable|boolean',
+            'waterfront_features' => 'nullable|string',
+            'swimming_pool' => 'nullable|boolean',
+            'tennis_court' => 'nullable|boolean',
+            'gated_community' => 'nullable|boolean',
+            'penthouse' => 'nullable|boolean',
+            'pets_allowed' => 'nullable|boolean',
+            'furnished' => 'nullable|boolean',
+            'golf_course' => 'nullable|boolean',
+            'boat_dock' => 'nullable|boolean',
+            'parking_spaces' => 'nullable|integer',
+        ]);
+
+        // Start with a base query to find the property
+        $propertyQuery = Property::with([
             'details',
             'amenities',
             'media',
             'schools',
             'financialDetails'
-        ])->findOrFail($id);
+        ])->where('id', $id);
 
-        // Format the response
+        // Apply type filter if provided
+        $type = $request->input('type', 'all');
+        if ($type && $type !== 'all') {
+            switch (strtolower($type)) {
+                case 'buy':
+                    // Properties for sale
+                    $propertyQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+                case 'rent':
+                    // Properties for rent
+                    $propertyQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+            }
+        }
+
+        // Apply property type filter if provided
+        if ($request->filled('property_type')) {
+            $propertyQuery->where('PropertyType', $request->property_type);
+        }
+
+        // Apply property subtype filter if provided
+        if ($request->filled('property_subtype')) {
+            $propertyQuery->where('PropertySubType', $request->property_subtype);
+        }
+
+        // Apply price filters if provided
+        if ($request->filled('min_price')) {
+            $propertyQuery->where('ListPrice', '>=', $request->min_price);
+        }
+        if ($request->filled('max_price')) {
+            $propertyQuery->where('ListPrice', '<=', $request->max_price);
+        }
+
+        // Apply bedroom filters if provided
+        if ($request->filled('min_beds')) {
+            $propertyQuery->where('BedroomsTotal', '>=', $request->min_beds);
+        }
+        if ($request->filled('max_beds')) {
+            $propertyQuery->where('BedroomsTotal', '<=', $request->max_beds);
+        }
+
+        // Apply bathroom filters if provided
+        if ($request->filled('min_baths')) {
+            $propertyQuery->where('BathroomsTotalInteger', '>=', $request->min_baths);
+        }
+        if ($request->filled('max_baths')) {
+            $propertyQuery->where('BathroomsTotalInteger', '<=', $request->max_baths);
+        }
+
+        // Apply living size filters if provided
+        if ($request->filled('min_living_size')) {
+            $propertyQuery->where('LivingArea', '>=', $request->min_living_size);
+        }
+        if ($request->filled('max_living_size')) {
+            $propertyQuery->where('LivingArea', '<=', $request->max_living_size);
+        }
+
+        // Apply land size filters if provided
+        if ($request->filled('min_land_size')) {
+            $propertyQuery->where('LotSizeSquareFeet', '>=', $request->min_land_size);
+        }
+        if ($request->filled('max_land_size')) {
+            $propertyQuery->where('LotSizeSquareFeet', '<=', $request->max_land_size);
+        }
+
+        // Apply year built filters if provided
+        if ($request->filled('min_year_built')) {
+            $propertyQuery->where('YearBuilt', '>=', $request->min_year_built);
+        }
+        if ($request->filled('max_year_built')) {
+            $propertyQuery->where('YearBuilt', '<=', $request->max_year_built);
+        }
+
+        // Apply waterfront filter if provided
+        if ($request->has('waterfront')) {
+            $waterfrontValue = filter_var($request->input('waterfront'), FILTER_VALIDATE_BOOLEAN);
+            // Check if the property has WaterfrontYN field matching the requested value
+            $propertyQuery->whereHas('details', function ($q) use ($waterfrontValue) {
+                if ($waterfrontValue) {
+                    // If looking for waterfront properties
+                    $q->where('WaterfrontYN', true);
+                } else {
+                    // If looking for non-waterfront properties
+                    $q->where(function ($subQuery) {
+                        $subQuery->where('WaterfrontYN', false)
+                            ->orWhereNull('WaterfrontYN');
+                    });
+                }
+            });
+        }
+
+        // Apply waterfront features filter if provided
+        if ($request->filled('waterfront_features')) {
+            $waterfrontFeatures = $request->input('waterfront_features');
+            // Split the input by commas if multiple features are provided
+            $featuresArray = explode(',', $waterfrontFeatures);
+
+            $propertyQuery->whereHas('details', function ($q) use ($featuresArray) {
+                foreach ($featuresArray as $feature) {
+                    $feature = trim($feature);
+                    if (!empty($feature)) {
+                        // Use LIKE query to find the feature in the comma-separated list
+                        $q->where('WaterfrontFeatures', 'LIKE', '%' . $feature . '%');
+                    }
+                }
+            });
+        }
+
+        // Apply swimming pool filter if provided
+        if ($request->has('swimming_pool') && $request->boolean('swimming_pool')) {
+            $propertyQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Swimming Pool%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Swimming Pool%')
+                    ->orWhere('PoolPrivateYN', true);
+            });
+        }
+
+        // Apply tennis court filter if provided
+        if ($request->has('tennis_court') && $request->boolean('tennis_court')) {
+            $propertyQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Tennis Court%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Tennis Court%');
+            });
+        }
+
+        // Apply gated community filter if provided
+        if ($request->has('gated_community') && $request->boolean('gated_community')) {
+            $propertyQuery->whereHas('amenities', function ($q) {
+                $q->where('CommunityFeatures', 'LIKE', '%Gated Community%')
+                    ->orWhere('AssociationAmenities', 'LIKE', '%Gated%');
+            });
+        }
+
+        // Apply penthouse filter if provided
+        if ($request->has('penthouse') && $request->boolean('penthouse')) {
+            $propertyQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Penthouse%')
+                    ->orWhere('PropertySubType', 'LIKE', '%Penthouse%');
+            });
+        }
+
+        // Apply pets allowed filter if provided
+        if ($request->has('pets_allowed') && $request->boolean('pets_allowed')) {
+            $propertyQuery->whereHas('amenities', function ($q) {
+                $q->where('PetsAllowed', true)
+                    ->orWhere('PetsAllowedYN', true);
+            });
+        }
+
+        // Apply furnished filter if provided
+        if ($request->has('furnished') && $request->boolean('furnished')) {
+            $propertyQuery->whereHas('amenities', function ($q) {
+                $q->where('Furnished', true);
+            });
+        }
+
+        // Apply golf course filter if provided
+        if ($request->has('golf_course') && $request->boolean('golf_course')) {
+            $propertyQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Golf Course%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Golf Course%');
+            });
+        }
+
+        // Apply boat dock filter if provided
+        if ($request->has('boat_dock') && $request->boolean('boat_dock')) {
+            $propertyQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Boat Dock%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Boat Dock%');
+            });
+        }
+
+        // Apply parking spaces filter if provided
+        if ($request->has('parking_spaces') && is_numeric($request->input('parking_spaces'))) {
+            $propertyQuery->whereHas('amenities', function ($q) use ($request) {
+                $q->where('ParkingTotal', '>=', $request->input('parking_spaces'));
+            });
+        }
+
+        // Find the property
+        $property = $propertyQuery->first();
+
+        // If property not found, return 404
+        if (!$property) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Property not found or does not match the specified criteria'
+            ], 404);
+        }
+
+        // Return the property details
         return response()->json([
             'success' => true,
             'property' => $property
@@ -920,6 +1023,7 @@ class PropertyApiController extends Controller
     //     // Validate request
     //     $request->validate([
     //         'street_number' => 'required|string',
+    //         'type' => 'required|string|in:buy,rent,all',
     //         'street_name' => 'required|string',
     //         'property_type' => 'nullable|string',
     //         'property_subtype' => 'nullable|string',
@@ -935,10 +1039,29 @@ class PropertyApiController extends Controller
     //         'max_land_size' => 'nullable|numeric',
     //         'min_year_built' => 'nullable|integer|min:1800|max:2025',
     //         'max_year_built' => 'nullable|integer|min:1800|max:2025',
+    //         'parking_spaces' => 'nullable|integer',
+    //         'waterfront' => 'nullable|boolean',
+    //         'waterfront_features' => 'nullable|string',
+    //         'pets_allowed' => 'nullable|boolean',
+    //         'furnished' => 'nullable|boolean',
+    //         'swimming_pool' => 'nullable|boolean',
+    //         'golf_course' => 'nullable|boolean',
+    //         'tennis_courts' => 'nullable|boolean',
+    //         'gated_community' => 'nullable|boolean',
+    //         'boat_dock' => 'nullable|boolean',
+    //         'limit' => 'nullable|integer|min:1',
+    //         'page' => 'nullable|integer|min:1',
+    //         'sort_by' => 'nullable|string|in:ListPrice,DateListed,BathroomsTotalInteger,BedroomsTotal,LivingArea,YearBuilt,LotSizeArea',
+    //         'sort_dir' => 'nullable|string|in:asc,desc'
     //     ]);
 
     //     $streetNumber = $request->input('street_number');
     //     $streetName = $request->input('street_name');
+    //     $type = $request->input('type', 'buy'); // Default to 'all' if not specified
+    //     $limit = $request->input('limit', 12);
+    //     $page = $request->input('page', 1);
+    //     $sortBy = $request->input('sort_by', 'ListPrice');
+    //     $sortDir = $request->input('sort_dir', 'asc');
 
     //     // Get building information
     //     $buildingInfo = DB::table('properties')
@@ -971,6 +1094,20 @@ class PropertyApiController extends Controller
     //         ->where('StreetNumber', $streetNumber)
     //         ->where('StreetName', $streetName)
     //         ->where('StandardStatus', 'Active');
+
+    //     // Apply type filter if provided
+    //     if ($type && $type !== 'all') {
+    //         switch (strtolower($type)) {
+    //             case 'buy':
+    //                 // Properties for sale
+    //                 $unitsQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+    //                 break;
+    //             case 'rent':
+    //                 // Properties for rent
+    //                 $unitsQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+    //                 break;
+    //         }
+    //     }
 
     //     // Apply property type filter if provided
     //     if ($request->filled('property_type')) {
@@ -1029,6 +1166,68 @@ class PropertyApiController extends Controller
     //     if ($request->filled('max_year_built')) {
     //         $unitsQuery->where('YearBuilt', '<=', $request->max_year_built);
     //     }
+
+    //     if ($request->has('waterfront')) {
+    //         $waterfrontValue = filter_var($request->input('waterfront'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    //         if (!is_null($waterfrontValue)) {
+    //             $query->join('property_details', 'properties.id', '=', 'property_details.property_id');
+
+    //             if ($waterfrontValue) {
+    //                 // Waterfront = true
+    //                 $unitsQuery->where('property_details.WaterfrontYN', true);
+    //             } else {
+    //                 // Waterfront = false or null
+    //                 $unitsQuery->where(function ($subQuery) {
+    //                     $subQuery->where('property_details.WaterfrontYN', false)
+    //                         ->orWhereNull('property_details.WaterfrontYN');
+    //                 });
+    //             }
+    //         }
+    //     }
+
+    //     if ($request->filled('waterfront_features')) {
+    //         $waterfrontFeatures = $request->input('waterfront_features');
+    //         $featuresArray = explode(',', $waterfrontFeatures);
+
+    //         $unitsQuery->whereHas('details', function ($q) use ($featuresArray) {
+    //             foreach ($featuresArray as $feature) {
+    //                 $feature = trim($feature);
+    //                 if (!empty($feature)) {
+    //                     $q->where('WaterfrontFeatures', 'LIKE', '%' . $feature . '%');
+    //                 }
+    //             }
+    //         });
+    //     }
+
+    //     if ($request->has('swimming_pool') && $request->boolean('swimming_pool')) {
+    //         $unitsQuery->whereHas('amenities', function ($q) {
+    //             $q->where('AssociationAmenities', 'LIKE', '%Pool%');
+    //         });
+    //     }
+
+    //     if ($request->has('tennis_court') && $request->boolean('tennis_court')) {
+    //         $unitsQuery->whereHas('amenities', function ($q) {
+    //             $q->where('AssociationAmenities', 'LIKE', '%TennisCourts%');
+    //         });
+    //     }
+
+    //     if ($request->has('gated_community') && $request->boolean('gated_community')) {
+    //         $unitsQuery->whereHas('amenities', function ($q) {
+    //             $q->where('CommunityFeatures', 'LIKE', '%Gated%');
+    //         });
+    //     }
+
+    //     if ($request->has('penthouse') && $request->boolean('penthouse')) {
+    //         $unitsQuery->whereHas('amenities', function ($q) {
+    //             $q->where('AssociationAmenities', 'LIKE', '%Penthouse%');
+    //         });
+    //     }
+
+    //     // Apply sorting
+    //     $unitsQuery->orderBy($sortBy, $sortDir);
+
+    //     // Get paginated results
+    //     $units = $unitsQuery->paginate($limit, ['*'], 'page', $page);
 
     //     // Get all filtered units in the building
     //     $units = $unitsQuery->get();
@@ -1090,11 +1289,28 @@ class PropertyApiController extends Controller
             'max_year_built' => 'nullable|integer|min:1800|max:2025',
             'waterfront' => 'nullable|boolean',
             'waterfront_features' => 'nullable|string',
+            'swimming_pool' => 'nullable|boolean',
+            'tennis_court' => 'nullable|boolean',
+            'gated_community' => 'nullable|boolean',
+            'penthouse' => 'nullable|boolean',
+            'pets_allowed' => 'nullable|boolean',
+            'furnished' => 'nullable|boolean',
+            'golf_course' => 'nullable|boolean',
+            'boat_dock' => 'nullable|boolean',
+            'parking_spaces' => 'nullable|integer',
+            'limit' => 'nullable|integer|min:1',
+            'page' => 'nullable|integer|min:1',
+            'sort_by' => 'nullable|string|in:ListPrice,DateListed,BathroomsTotalInteger,BedroomsTotal,LivingArea,YearBuilt',
+            'sort_dir' => 'nullable|string|in:asc,desc',
         ]);
 
         $streetNumber = $request->input('street_number');
         $streetName = $request->input('street_name');
-        $type = $request->input('type', 'buy'); // Default to 'all' if not specified
+        $type = $request->input('type', 'all'); // Default to 'all' if not specified
+        $limit = $request->input('limit', 12); // Default to 10 items per page
+        $page = $request->input('page', 1); // Default to first page
+        $sortBy = $request->input('sort_by', 'ListPrice'); // Default sort by price
+        $sortDir = $request->input('sort_dir', 'asc'); // Default sort direction
 
         // Get building information
         $buildingInfo = DB::table('properties')
@@ -1123,7 +1339,7 @@ class PropertyApiController extends Controller
         }
 
         // Start building the query for units
-        $unitsQuery = Property::with(['details', 'media'])
+        $unitsQuery = Property::with(['details', 'media', 'amenities'])
             ->where('StreetNumber', $streetNumber)
             ->where('StreetName', $streetName)
             ->where('StandardStatus', 'Active');
@@ -1200,18 +1416,30 @@ class PropertyApiController extends Controller
             $unitsQuery->where('YearBuilt', '<=', $request->max_year_built);
         }
 
-        if ($request->has('waterfront') && $request->input('waterfront')) {
-            // Check if the property has WaterfrontYN field set to true in property_details
-            $unitsQuery->whereHas('details', function ($q) {
-                $q->where('WaterfrontYN', true);
+        // Apply waterfront filter if provided
+        if ($request->has('waterfront')) {
+            $waterfrontValue = filter_var($request->input('waterfront'), FILTER_VALIDATE_BOOLEAN);
+            // Check if the property has WaterfrontYN field matching the requested value
+            $unitsQuery->whereHas('details', function ($q) use ($waterfrontValue) {
+                if ($waterfrontValue) {
+                    // If looking for waterfront properties
+                    $q->where('WaterfrontYN', true);
+                } else {
+                    // If looking for non-waterfront properties
+                    $q->where(function ($subQuery) {
+                        $subQuery->where('WaterfrontYN', false)
+                            ->orWhereNull('WaterfrontYN');
+                    });
+                }
             });
         }
 
+        // Apply waterfront features filter if provided
         if ($request->filled('waterfront_features')) {
             $waterfrontFeatures = $request->input('waterfront_features');
             // Split the input by commas if multiple features are provided
             $featuresArray = explode(',', $waterfrontFeatures);
-            
+
             $unitsQuery->whereHas('details', function ($q) use ($featuresArray) {
                 foreach ($featuresArray as $feature) {
                     $feature = trim($feature);
@@ -1223,8 +1451,90 @@ class PropertyApiController extends Controller
             });
         }
 
-        // Get all filtered units in the building
-        $units = $unitsQuery->get();
+        // Apply swimming pool filter if provided
+        if ($request->has('swimming_pool') && $request->boolean('swimming_pool')) {
+            $unitsQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Swimming Pool%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Pool%')
+                    ->orWhere('PoolPrivateYN', true);
+            });
+        }
+
+        // Apply tennis court filter if provided
+        if ($request->has('tennis_court') && $request->boolean('tennis_court')) {
+            $unitsQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Tennis Court%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%TennisCourts%');
+            });
+        }
+
+        // Apply gated community filter if provided
+        if ($request->has('gated_community') && $request->boolean('gated_community')) {
+            $unitsQuery->whereHas('amenities', function ($q) {
+                $q->where('CommunityFeatures', 'LIKE', '%Gated Community%')
+                    ->orWhere('AssociationAmenities', 'LIKE', '%Gated%');
+            });
+        }
+
+        // Apply penthouse filter if provided
+        if ($request->has('penthouse') && $request->boolean('penthouse')) {
+            $unitsQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Penthouse%')
+                    ->orWhere('PropertySubType', 'LIKE', '%Penthouse%');
+            });
+        }
+
+        // Apply pets allowed filter if provided
+        if ($request->has('pets_allowed') && $request->boolean('pets_allowed')) {
+            $unitsQuery->whereHas('amenities', function ($q) {
+                $q->where('PetsAllowed', true)
+                    ->orWhere('PetsAllowedYN', true);
+            });
+        }
+
+        // Apply furnished filter if provided
+        if ($request->has('furnished') && $request->boolean('furnished')) {
+            $unitsQuery->whereHas('amenities', function ($q) {
+                $q->where('Furnished', true);
+            });
+        }
+
+        // Apply golf course filter if provided
+        if ($request->has('golf_course') && $request->boolean('golf_course')) {
+            $unitsQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Golf Course%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%GolfCourse%');
+            });
+        }
+
+        // Apply boat dock filter if provided
+        if ($request->has('boat_dock') && $request->boolean('boat_dock')) {
+            $unitsQuery->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Boat Dock%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%BoatDock%');
+            });
+        }
+
+        // Apply parking spaces filter if provided
+        if ($request->has('parking_spaces') && is_numeric($request->input('parking_spaces'))) {
+            $unitsQuery->whereHas('amenities', function ($q) use ($request) {
+                $q->where('ParkingTotal', '>=', $request->input('parking_spaces'));
+            });
+        }
+
+        // Apply sorting
+        if ($request->filled('sort_by') && $request->filled('sort_dir')) {
+            $unitsQuery->orderBy($sortBy, $sortDir);
+        } else {
+            // Default sorting by price
+            $unitsQuery->orderBy('ListPrice', 'asc');
+        }
+
+        // Get total count before pagination
+        $totalCount = $unitsQuery->count();
+
+        // Apply pagination
+        $units = $unitsQuery->skip(($page - 1) * $limit)->take($limit)->get();
 
         // Separate units by type (sale vs rental)
         $salesUnits = $units->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
@@ -1254,222 +1564,18 @@ class PropertyApiController extends Controller
                 'for_sale' => $salesUnits,
                 'for_rent' => $rentalUnits
             ],
-            'total_units' => $units->count(),
+            'total_units' => $totalCount,
             'sales_units_count' => $salesUnits->count(),
             'rental_units_count' => $rentalUnits->count(),
+            'meta' => [
+                'current_page' => (int)$page,
+                'per_page' => (int)$limit,
+                'total' => $totalCount,
+                'last_page' => ceil($totalCount / $limit),
+                'has_more_pages' => ($page * $limit) < $totalCount
+            ]
         ]);
     }
-
-    // public function places(Request $request)
-    // {
-    //     // Validate request
-    //     $request->validate([
-    //         'city' => 'nullable|string',
-    //         'state' => 'nullable|string',
-    //         'limit' => 'nullable|integer|min:1',
-    //         'page' => 'nullable|integer|min:1',
-    //         'sort_by' => 'nullable|string|in:ListPrice,DateListed,BathroomsTotalInteger,BedroomsTotal,LivingArea,YearBuilt,LotSizeArea',
-    //         'sort_dir' => 'nullable|string|in:asc,desc',
-    //         'property_type' => 'nullable|string',
-    //         'property_subtype' => 'nullable|string',
-    //         'min_price' => 'nullable|numeric',
-    //         'max_price' => 'nullable|numeric',
-    //         'min_beds' => 'nullable|integer',
-    //         'max_beds' => 'nullable|integer',
-    //         'min_baths' => 'nullable|integer',
-    //         'max_baths' => 'nullable|integer',
-    //         'min_living_size' => 'nullable|numeric',
-    //         'max_living_size' => 'nullable|numeric',
-    //         'min_land_size' => 'nullable|numeric',
-    //         'max_land_size' => 'nullable|numeric',
-    //         'min_year_built' => 'nullable|integer|min:1800|max:2025',
-    //         'max_year_built' => 'nullable|integer|min:1800|max:2025',
-    //         'waterfront' => 'nullable|boolean',
-    //         'pets_allowed' => 'nullable|boolean',
-    //         'furnished' => 'nullable|boolean',
-    //         'swimming_pool' => 'nullable|boolean',
-    //         'golf_course' => 'nullable|boolean',
-    //         'tennis_courts' => 'nullable|boolean',
-    //         'gated_community' => 'nullable|boolean',
-    //         'boat_dock' => 'nullable|boolean',
-    //     ]);
-
-    //     $city = $request->input('city');
-    //     $state = $request->input('state');
-    //     $limit = $request->input('limit', 20);
-    //     $page = $request->input('page', 1);
-    //     $sortBy = $request->input('sort_by', 'ListPrice');
-    //     $sortDir = $request->input('sort_dir', 'asc');
-    //     $propertyType = $request->input('property_type');
-    //     $propertySubtype = $request->input('property_subtype'); // New parameter
-
-    //     // Ensure at least one location parameter is provided
-    //     if (empty($city) && empty($state)) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Either city or state parameter is required'
-    //         ], 400);
-    //     }
-
-    //     // Build query
-    //     $query = Property::with(['details', 'amenities', 'media'])->where('StandardStatus', 'Active');
-
-    //     // Apply city filter if provided
-    //     if (!empty($city)) {
-    //         $query->where('City', $city);
-    //     }
-
-    //     // Apply state filter if provided
-    //     if (!empty($state)) {
-    //         $query->where('StateOrProvince', $state);
-    //     }
-
-    //     // Apply property type filter if provided
-    //     if (!empty($propertyType)) {
-    //         $query->where('PropertyType', $propertyType);
-    //     }
-
-    //     // Apply property subtype filter if provided
-    //     if (!empty($propertySubtype)) {
-    //         $query->where('PropertySubType', $propertySubtype);
-    //     }
-
-    //     // Apply price filters if provided
-    //     if ($request->has('min_price')) {
-    //         $query->where('ListPrice', '>=', $request->input('min_price'));
-    //     }
-    //     if ($request->has('max_price')) {
-    //         $query->where('ListPrice', '<=', $request->input('max_price'));
-    //     }
-
-    //     // Apply bedroom filters if provided
-    //     if ($request->has('min_beds')) {
-    //         $query->where('BedroomsTotal', '>=', $request->input('min_beds'));
-    //     }
-    //     if ($request->has('max_beds')) {
-    //         $query->where('BedroomsTotal', '<=', $request->input('max_beds'));
-    //     }
-
-    //     // Apply bathroom filters if provided
-    //     if ($request->has('min_baths')) {
-    //         $query->where('BathroomsTotalInteger', '>=', $request->input('min_baths'));
-    //     }
-    //     if ($request->has('max_baths')) {
-    //         $query->where('BathroomsTotalInteger', '<=', $request->input('max_baths'));
-    //     }
-
-    //     // Apply living size filters if provided
-    //     if ($request->has('min_living_size')) {
-    //         $query->where('LivingArea', '>=', $request->input('min_living_size'));
-    //     }
-    //     if ($request->has('max_living_size')) {
-    //         $query->where('LivingArea', '<=', $request->input('max_living_size'));
-    //     }
-
-    //     // Apply land size filters if provided
-    //     if ($request->has('min_land_size')) {
-    //         $query->where('LotSizeSquareFeet', '>=', $request->input('min_land_size'));
-    //     }
-    //     if ($request->has('max_land_size')) {
-    //         $query->where('LotSizeSquareFeet', '<=', $request->input('max_land_size'));
-    //     }
-
-    //     // Apply year built filters if provided
-    //     if ($request->has('min_year_built')) {
-    //         $query->where('YearBuilt', '>=', $request->input('min_year_built'));
-    //     }
-    //     if ($request->has('max_year_built')) {
-    //         $query->where('YearBuilt', '<=', $request->input('max_year_built'));
-    //     }
-
-    //     // if ($request->has('waterfront') && $request->input('waterfront')) {
-    //     //     // Check if the property has WaterfrontYN field set to true in property_details
-    //     //     $query->whereHas('details', function($q) {
-    //     //         $q->where('WaterfrontYN', true);
-    //     //     });
-    //     // }
-
-    //     // // Pets allowed filter
-    //     // if ($request->has('pets_allowed') && $request->input('pets_allowed')) {
-    //     //     // Check if pets are allowed in property_amenities
-    //     //     $query->whereHas('amenities', function($q) {
-    //     //         $q->where('PetsAllowed', true)
-    //     //           ->orWhere('PetsAllowedYN', true);
-    //     //     });
-    //     // }
-
-    //     // // Furnished filter
-    //     // if ($request->has('furnished') && $request->input('furnished')) {
-    //     //     // Check if property is furnished
-    //     //     $query->whereHas('amenities', function($q) {
-    //     //         $q->where('Furnished', true);
-    //     //     });
-    //     // }
-
-    //     // // Swimming pool filter
-    //     // if ($request->has('swimming_pool') && $request->input('swimming_pool')) {
-    //     //     $query->whereHas('amenities', function($q) {
-    //     //         $q->where('PoolPrivateYN', true)
-    //     //           ->orWhere('CommunityFeatures', 'like', '%Swimming Pool%')
-    //     //           ->orWhere('AssociationAmenities', 'like', '%Swimming Pool%');
-    //     //     });
-    //     // }
-
-    //     // Golf course filter
-    //     // if ($request->has('golf_course') && $request->input('golf_course')) {
-    //     //     $query->whereHas('amenities', function($q) {
-    //     //         $q->where('AssociationAmenities', 'like', '%Golf Course%');
-    //     //     });
-    //     // }
-
-    //     // // Tennis courts filter
-    //     // if ($request->has('tennis_courts') && $request->input('tennis_courts')) {
-    //     //     $query->whereHas('amenities', function($q) {
-    //     //         $q->where('AssociationAmenities', 'like', '%Tennis Court%');
-    //     //     });
-    //     // }
-
-    //     // // Gated community filter
-    //     // if ($request->has('gated_community') && $request->input('gated_community')) {
-    //     //     $query->whereHas('amenities', function($q) {
-    //     //         $q->where('CommunityFeatures', 'like', '%Gated%');
-    //     //     });
-    //     // }
-
-    //     // // Boat dock filter
-    //     // if ($request->has('boat_dock') && $request->input('boat_dock')) {
-    //     //     $query->whereHas('amenities', function($q) {
-    //     //         $q->where('AssociationAmenities', 'like', '%Boat Dock%');
-    //     //     });
-    //     // }
-
-    //     // Apply sorting
-    //     $query->orderBy($sortBy, $sortDir);
-
-    //     // Get paginated results
-    //     $properties = $query->paginate($limit, ['*'], 'page', $page);
-
-    //     // Get location information
-    //     $locationInfo = [
-    //         'city' => $city,
-    //         'state' => $state,
-    //         'total_properties' => $properties->total()
-    //     ];
-
-    //     // Format the response
-    //     return response()->json([
-    //         'success' => true,
-    //         'location' => $locationInfo,
-    //         'properties' => $properties->items(),
-    //         'meta' => [
-    //             'current_page' => $properties->currentPage(),
-    //             'per_page' => $properties->perPage(),
-    //             'total' => $properties->total(),
-    //             'last_page' => $properties->lastPage(),
-    //             'has_more_pages' => $properties->hasMorePages()
-    //         ]
-    //     ]);
-    // }
 
     public function places(Request $request)
     {
@@ -1496,7 +1602,9 @@ class PropertyApiController extends Controller
             'max_land_size' => 'nullable|numeric',
             'min_year_built' => 'nullable|integer|min:1800|max:2025',
             'max_year_built' => 'nullable|integer|min:1800|max:2025',
+            'parking_spaces' => 'nullable|integer',
             'waterfront' => 'nullable|boolean',
+            'waterfront_features' => 'nullable|string',
             'pets_allowed' => 'nullable|boolean',
             'furnished' => 'nullable|boolean',
             'swimming_pool' => 'nullable|boolean',
@@ -1516,6 +1624,8 @@ class PropertyApiController extends Controller
         $propertyType = $request->input('property_type');
         $propertySubtype = $request->input('property_subtype');
 
+        // dd($request->all(),$type);
+
         // Ensure at least one location parameter is provided
         if (empty($city) && empty($state)) {
             return response()->json([
@@ -1525,7 +1635,9 @@ class PropertyApiController extends Controller
         }
 
         // Build query
-        $query = Property::with(['details', 'amenities', 'media'])->where('StandardStatus', 'Active');
+        $query = Property::select('properties.*')
+            ->with(['details', 'amenities', 'media'])
+            ->where('StandardStatus', 'Active');
 
         // Apply type filter if provided
         if ($type && $type !== 'all') {
@@ -1609,6 +1721,83 @@ class PropertyApiController extends Controller
             $query->where('YearBuilt', '<=', $request->input('max_year_built'));
         }
 
+        if ($request->has('parking_spaces') && is_numeric($request->input('parking_spaces'))) {
+            $query->whereHas('amenities', function ($q) use ($request) {
+                $q->where('ParkingTotal', '=', $request->input('parking_spaces'));
+            });
+        }
+
+        if ($request->has('waterfront')) {
+            $waterfrontValue = filter_var($request->input('waterfront'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if (!is_null($waterfrontValue)) {
+                $query->join('property_details', 'properties.id', '=', 'property_details.property_id');
+
+                if ($waterfrontValue) {
+                    // Waterfront = true
+                    $query->where('property_details.WaterfrontYN', true);
+                } else {
+                    // Waterfront = false or null
+                    $query->where(function ($subQuery) {
+                        $subQuery->where('property_details.WaterfrontYN', false)
+                            ->orWhereNull('property_details.WaterfrontYN');
+                    });
+                }
+            }
+        }
+
+        if ($request->filled('waterfront_features')) {
+            $waterfrontFeatures = $request->input('waterfront_features');
+            $featuresArray = explode(',', $waterfrontFeatures);
+
+            $query->whereHas('details', function ($q) use ($featuresArray) {
+                foreach ($featuresArray as $feature) {
+                    $feature = trim($feature);
+                    if (!empty($feature)) {
+                        $q->where('WaterfrontFeatures', 'LIKE', '%' . $feature . '%');
+                    }
+                }
+            });
+        }
+
+        if ($request->has('swimming_pool') && $request->boolean('swimming_pool')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Pool%');
+            });
+        }
+
+        if ($request->has('tennis_court') && $request->boolean('tennis_court')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%TennisCourts%');
+            });
+        }
+
+        if ($request->has('gated_community') && $request->boolean('gated_community')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('CommunityFeatures', 'LIKE', '%Gated%');
+            });
+        }
+
+        if ($request->has('penthouse') && $request->boolean('penthouse')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Penthouse%');
+            });
+        }
+
+        if ($request->has('golf_course') && $request->boolean('golf_course')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Golf Course%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%GolfCourse%');
+            });
+        }
+
+        // Apply boat dock filter if provided
+        if ($request->has('boat_dock') && $request->boolean('boat_dock')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Boat Dock%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%BoatDock%');
+            });
+        }
+
         // Apply sorting
         $query->orderBy($sortBy, $sortDir);
 
@@ -1633,6 +1822,170 @@ class PropertyApiController extends Controller
                 'total' => $properties->total(),
                 'last_page' => $properties->lastPage(),
                 'has_more_pages' => $properties->hasMorePages()
+            ]
+        ]);
+    }
+
+    /**
+     * Get properties within a specified radius from a point
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPropertiesInRadius(Request $request)
+    {
+        // Validate the request parameters
+        $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius' => 'required|numeric|min:0.1|max:50', // radius in kilometers, with reasonable limits
+            'limit' => 'nullable|integer|min:1|max:50', // limit the number of results
+            'page' => 'nullable|integer|min:1',
+            'type' => 'nullable|string|in:buy,rent,all',
+            'property_type' => 'nullable|string',
+            'property_subtype' => 'nullable|string',
+            'min_price' => 'nullable|numeric',
+            'max_price' => 'nullable|numeric',
+            'min_beds' => 'nullable|integer',
+            'max_beds' => 'nullable|integer',
+            'min_baths' => 'nullable|integer',
+            'max_baths' => 'nullable|integer',
+            'min_living_size' => 'nullable|numeric',
+            'max_living_size' => 'nullable|numeric',
+            'waterfront' => 'nullable|boolean',
+            'min_year_built' => 'nullable|integer',
+            'max_year_built' => 'nullable|integer',
+        ]);
+
+        // Get parameters from request
+        $latitude = $request->input('latitude');
+        $longitude = $request->input('longitude');
+        $radius = $request->input('radius'); // in kilometers
+        $limit = $request->input('limit', 10); // default to 10 properties
+        $page = $request->input('page', 1);
+        $type = $request->input('type', 'all');
+
+        // Calculate the distance using the Haversine formula in MySQL
+        // 6371 is the Earth's radius in kilometers
+        $query = Property::with(['details', 'media'])
+            ->select('properties.*')
+            ->selectRaw("
+            (6371 * acos(
+                cos(radians(?)) * 
+                cos(radians(latitude)) * 
+                cos(radians(longitude) - radians(?)) + 
+                sin(radians(?)) * 
+                sin(radians(latitude))
+            )) AS distance", [$latitude, $longitude, $latitude])
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->where('StandardStatus', 'Active')
+            ->having('distance', '<=', $radius)
+            ->orderBy('distance', 'asc');
+
+        // Apply type filter if provided
+        if ($type && $type !== 'all') {
+            switch (strtolower($type)) {
+                case 'buy':
+                    // Properties for sale
+                    $query->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+                case 'rent':
+                    // Properties for rent
+                    $query->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+            }
+        }
+
+        // Apply property type filter if provided
+        if ($request->filled('property_type')) {
+            $query->where('PropertyType', $request->property_type);
+        }
+
+        // Apply property subtype filter if provided
+        if ($request->filled('property_subtype')) {
+            $query->where('PropertySubType', $request->property_subtype);
+        }
+
+        // Apply price filters if provided
+        if ($request->filled('min_price')) {
+            $query->where('ListPrice', '>=', $request->min_price);
+        }
+        if ($request->filled('max_price')) {
+            $query->where('ListPrice', '<=', $request->max_price);
+        }
+
+        // Apply bedroom filters if provided
+        if ($request->filled('min_beds')) {
+            $query->where('BedroomsTotal', '>=', $request->min_beds);
+        }
+        if ($request->filled('max_beds')) {
+            $query->where('BedroomsTotal', '<=', $request->max_beds);
+        }
+
+        // Apply bathroom filters if provided
+        if ($request->filled('min_baths')) {
+            $query->where('BathroomsTotalInteger', '>=', $request->min_baths);
+        }
+        if ($request->filled('max_baths')) {
+            $query->where('BathroomsTotalInteger', '<=', $request->max_baths);
+        }
+
+        // Apply living size filters if provided
+        if ($request->filled('min_living_size')) {
+            $query->where('LivingArea', '>=', $request->min_living_size);
+        }
+        if ($request->filled('max_living_size')) {
+            $query->where('LivingArea', '<=', $request->max_living_size);
+        }
+
+        // Apply year built filters if provided
+        if ($request->filled('min_year_built')) {
+            $query->where('YearBuilt', '>=', $request->min_year_built);
+        }
+        if ($request->filled('max_year_built')) {
+            $query->where('YearBuilt', '<=', $request->max_year_built);
+        }
+
+        // Apply waterfront filter if provided
+        if ($request->has('waterfront')) {
+            $waterfrontValue = filter_var($request->input('waterfront'), FILTER_VALIDATE_BOOLEAN);
+            // Check if the property has WaterfrontYN field matching the requested value
+            $query->whereHas('details', function ($q) use ($waterfrontValue) {
+                if ($waterfrontValue) {
+                    // If looking for waterfront properties
+                    $q->where('WaterfrontYN', true);
+                } else {
+                    // If looking for non-waterfront properties
+                    $q->where(function ($subQuery) {
+                        $subQuery->where('WaterfrontYN', false)
+                            ->orWhereNull('WaterfrontYN');
+                    });
+                }
+            });
+        }
+
+        // Get the total count before pagination
+        $totalCount = $query->count();
+
+        // Apply pagination
+        $offset = ($page - 1) * $limit;
+        $properties = $query->skip($offset)->take($limit)->get();
+
+        // Format the response
+        return response()->json([
+            'success' => true,
+            'data' => $properties,
+            'meta' => [
+                'current_page' => (int)$page,
+                'per_page' => (int)$limit,
+                'total' => $totalCount,
+                'has_more' => ($offset + $limit) < $totalCount,
+                'center' => [
+                    'latitude' => (float)$latitude,
+                    'longitude' => (float)$longitude
+                ],
+                'radius' => (float)$radius
             ]
         ]);
     }

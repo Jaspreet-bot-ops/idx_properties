@@ -49,4 +49,6 @@ Route::get('/api/buildings', [PropertyApiController::class, 'buildings']);
 // Place properties search endpoint
 Route::get('/api/propertiesByPlace', [PropertyApiController::class, 'places']);
 
+Route::get('/properties/radius', [PropertyApiController::class, 'getPropertiesInRadius']);
+
 require __DIR__.'/auth.php';
