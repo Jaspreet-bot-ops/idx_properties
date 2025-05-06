@@ -9,222 +9,6 @@ use Illuminate\Support\Facades\DB;
 
 class PropertyApiController extends Controller
 {
-    // public function getNewDevelopments(Request $request)
-    // {
-    //     // Start with the base query
-    //     $query = Property::with([
-    //         'details',
-    //         'amenities',
-    //         'media',
-    //         'schools',
-    //         'financialDetails'
-    //     ]);
-
-    //     // Apply YearBuilt filter (null or greater than 2024)
-    //     $query->where('YearBuilt', '>', 2024);
-
-    //     // Apply StandardStatus filter
-    //     $query->where('StandardStatus', 'Active');
-
-    //     // Apply ordering if requested
-    //     if ($request->has('orderby')) {
-    //         $orderBy = $request->input('orderby');
-    //         $direction = 'asc';
-
-    //         if (strpos($orderBy, ' desc') !== false) {
-    //             $orderBy = str_replace(' desc', '', $orderBy);
-    //             $direction = 'desc';
-    //         }
-
-    //         // Check if the order column is in the details table
-    //         if (in_array($orderBy, ['DevelopmentStatus'])) {
-    //             // For columns in related tables, we need to use a different approach
-    //             // We'll order by the relationship's column
-    //             $query->join('property_details', 'properties.id', '=', 'property_details.property_id')
-    //                 ->orderBy('property_details.' . $orderBy, $direction)
-    //                 ->select('properties.*'); // Make sure we only select from the properties table
-    //         } else {
-    //             // For columns in the main properties table
-    //             $query->orderByRaw("CASE WHEN PropertySubType = 'Condominium' THEN 0 ELSE 1 END")
-    //                 ->orderBy('YearBuilt', 'desc');
-    //         }
-    //     } else {
-    //         // Default ordering
-    //         $query->orderByRaw("CASE WHEN PropertySubType = 'Condominium' THEN 0 ELSE 1 END")
-    //             ->orderBy('YearBuilt', 'desc');
-    //     }
-
-    //     // Get the total count before pagination
-    //     $totalCount = $query->count();
-
-    //     // Handle pagination parameters
-    //     $limit = $request->input('limit', 10); // Default to 10 items per page
-    //     $page = $request->input('page', 1);    // Default to first page
-    //     $offset = ($page - 1) * $limit;        // Calculate the offset
-
-    //     // Apply limit and offset
-    //     $properties = $query->skip($offset)->take($limit)->get();
-
-    //     // Format the response
-    //     return response()->json([
-    //         'properties' => $properties,
-    //         'meta' => [
-    //             'current_page' => (int)$page,
-    //             'per_page' => (int)$limit,
-    //             'total' => $totalCount,
-    //             'has_more' => ($offset + $limit) < $totalCount
-    //         ]
-    //     ]);
-    // }
-
-
-    // public function getNewDevelopments(Request $request)
-    // {
-    //     // Start with a query to group new developments by address
-    //     $buildingsQuery = DB::table('properties')
-    //         ->select(
-    //             'StreetNumber',
-    //             'StreetName',
-    //             'City',
-    //             'StateOrProvince',
-    //             'PostalCode',
-    //             'PropertySubType',
-    //             'YearBuilt',
-    //             DB::raw('COUNT(*) as unit_count'),
-    //             DB::raw('MIN(ListPrice) as min_price'),
-    //             DB::raw('MAX(ListPrice) as max_price'),
-    //             DB::raw('MIN(id) as representative_id') // Get one property ID to represent the building
-    //         )
-    //         ->where('YearBuilt', '>', 2024)
-    //         ->where('StandardStatus', 'Active')
-    //         ->whereNotNull('StreetNumber')
-    //         ->whereNotNull('StreetName')
-    //         ->groupBy('StreetNumber', 'StreetName', 'City', 'StateOrProvince', 'PostalCode', 'PropertySubType', 'YearBuilt');
-
-    //     // Apply ordering if requested
-    //     if ($request->has('orderby')) {
-    //         $orderBy = $request->input('orderby');
-    //         $direction = 'asc';
-
-    //         if (strpos($orderBy, ' desc') !== false) {
-    //             $orderBy = str_replace(' desc', '', $orderBy);
-    //             $direction = 'desc';
-    //         }
-
-    //         // Map the order column to an appropriate aggregate function if needed
-    //         switch ($orderBy) {
-    //             case 'ListPrice':
-    //                 $buildingsQuery->orderBy('min_price', $direction);
-    //                 break;
-    //             case 'unit_count':
-    //                 $buildingsQuery->orderBy('unit_count', $direction);
-    //                 break;
-    //             default:
-    //                 // For other columns, try to order by them directly
-    //                 $buildingsQuery->orderBy($orderBy, $direction);
-    //                 break;
-    //         }
-    //     } else {
-    //         // Default ordering - prioritize condominiums and newer buildings
-    //         $buildingsQuery->orderByRaw("CASE WHEN PropertySubType = 'Condominium' THEN 0 ELSE 1 END")
-    //             ->orderBy('YearBuilt', 'desc')
-    //             ->orderBy('unit_count', 'desc');
-    //     }
-
-    //     // Get the total count before pagination
-    //     $totalCount = $buildingsQuery->count();
-
-    //     // Handle pagination parameters
-    //     $limit = $request->input('limit', 10); // Default to 10 items per page
-    //     $page = $request->input('page', 1); // Default to first page
-    //     $offset = ($page - 1) * $limit; // Calculate the offset
-
-    //     // Apply limit and offset
-    //     $buildings = $buildingsQuery->skip($offset)->take($limit)->get();
-
-    //     // Get the representative property IDs
-    //     $representativeIds = $buildings->pluck('representative_id')->toArray();
-
-    //     // Fetch the representative properties with their relationships
-    //     $representativeProperties = Property::with(['details', 'media', 'amenities', 'schools', 'financialDetails'])
-    //         ->whereIn('id', $representativeIds)
-    //         ->get()
-    //         ->keyBy('id'); // Index by ID for easier lookup
-
-    //     // Format the building data with representative property information
-    //     $formattedBuildings = $buildings->map(function ($building) use ($representativeProperties) {
-    //         // Get the representative property
-    //         $property = $representativeProperties[$building->representative_id] ?? null;
-
-    //         // Create a building name from the address
-    //         $buildingName = trim($building->StreetNumber . ' ' . $building->StreetName);
-
-    //         // Get a representative image URL if available
-    //         $imageUrl = null;
-    //         if ($property && isset($property->media) && $property->media->isNotEmpty()) {
-    //             $imageUrl = $property->media->first()->MediaURL ?? null;
-    //         }
-
-    //         // Clean up city value
-    //         $city = ($building->City == ',' || empty($building->City)) ? null : $building->City;
-
-    //         // Create the formatted building data
-    //         $formattedBuilding = [
-    //             'id' => $building->representative_id,
-    //             'building_name' => $buildingName,
-    //             'address' => $buildingName,
-    //             'city' => $city,
-    //             'state' => $building->StateOrProvince,
-    //             'postal_code' => $building->PostalCode,
-    //             'property_subtype' => $building->PropertySubType,
-    //             'year_built' => $building->YearBuilt,
-    //             'unit_count' => $building->unit_count,
-    //             'price_range' => [
-    //                 'min' => $building->min_price,
-    //                 'max' => $building->max_price
-    //             ],
-    //             'image_url' => $imageUrl,
-    //             'action_url' => "/api/buildings?street_number={$building->StreetNumber}&street_name=" . urlencode($building->StreetName)
-    //         ];
-
-    //         // Add related data from the representative property
-    //         if ($property) {
-    //             // Add details if available
-    //             if (isset($property->details)) {
-    //                 $formattedBuilding['details'] = $property->details;
-    //             }
-
-    //             // Add amenities if available
-    //             if (isset($property->amenities)) {
-    //                 $formattedBuilding['amenities'] = $property->amenities;
-    //             }
-
-    //             // Add schools if available
-    //             if (isset($property->schools)) {
-    //                 $formattedBuilding['schools'] = $property->schools;
-    //             }
-
-    //             // Add financial details if available
-    //             if (isset($property->financialDetails)) {
-    //                 $formattedBuilding['financial_details'] = $property->financialDetails;
-    //             }
-    //         }
-
-    //         return $formattedBuilding;
-    //     });
-
-    //     // Format the response
-    //     return response()->json([
-    //         'properties' => $formattedBuildings,
-    //         'meta' => [
-    //             'current_page' => (int)$page,
-    //             'per_page' => (int)$limit,
-    //             'total' => $totalCount,
-    //             'has_more' => ($offset + $limit) < $totalCount
-    //         ]
-    //     ]);
-    // }
-
     public function getNewDevelopments(Request $request)
     {
         // Start with a query to group new developments by address
@@ -1277,10 +1061,12 @@ class PropertyApiController extends Controller
             'property_subtype' => 'nullable|string',
             'min_price' => 'nullable|numeric',
             'max_price' => 'nullable|numeric',
-            'min_beds' => 'nullable|integer',
-            'max_beds' => 'nullable|integer',
-            'min_baths' => 'nullable|integer',
-            'max_baths' => 'nullable|integer',
+            // 'min_beds' => 'nullable|integer',
+            // 'max_beds' => 'nullable|integer',
+            // 'min_baths' => 'nullable|integer',
+            // 'max_baths' => 'nullable|integer',
+            'beds' => 'nullable|integer',
+            'baths' => 'nullable|integer',
             'min_living_size' => 'nullable|numeric',
             'max_living_size' => 'nullable|numeric',
             'min_land_size' => 'nullable|numeric',
@@ -1376,21 +1162,30 @@ class PropertyApiController extends Controller
             $unitsQuery->where('ListPrice', '<=', $request->max_price);
         }
 
-        // Apply bedroom filters if provided
-        if ($request->filled('min_beds')) {
-            $unitsQuery->where('BedroomsTotal', '>=', $request->min_beds);
+        if ($request->filled('beds')) {
+            $unitsQuery->where('BedroomsTotal', $request->beds);
         }
-        if ($request->filled('max_beds')) {
-            $unitsQuery->where('BedroomsTotal', '<=', $request->max_beds);
+        
+        // Apply bathroom filter if provided
+        if ($request->filled('baths')) {
+            $unitsQuery->where('BathroomsTotalInteger', $request->baths);
         }
 
-        // Apply bathroom filters if provided
-        if ($request->filled('min_baths')) {
-            $unitsQuery->where('BathroomsTotalInteger', '>=', $request->min_baths);
-        }
-        if ($request->filled('max_baths')) {
-            $unitsQuery->where('BathroomsTotalInteger', '<=', $request->max_baths);
-        }
+        // // Apply bedroom filters if provided
+        // if ($request->filled('min_beds')) {
+        //     $unitsQuery->where('BedroomsTotal', '>=', $request->min_beds);
+        // }
+        // if ($request->filled('max_beds')) {
+        //     $unitsQuery->where('BedroomsTotal', '<=', $request->max_beds);
+        // }
+
+        // // Apply bathroom filters if provided
+        // if ($request->filled('min_baths')) {
+        //     $unitsQuery->where('BathroomsTotalInteger', '>=', $request->min_baths);
+        // }
+        // if ($request->filled('max_baths')) {
+        //     $unitsQuery->where('BathroomsTotalInteger', '<=', $request->max_baths);
+        // }
 
         // Apply living size filters if provided
         if ($request->filled('min_living_size')) {
@@ -1596,6 +1391,8 @@ class PropertyApiController extends Controller
             'max_beds' => 'nullable|integer',
             'min_baths' => 'nullable|integer',
             'max_baths' => 'nullable|integer',
+            'beds' => 'nullable|integer',
+            'baths' => 'nullable|integer',
             'min_living_size' => 'nullable|numeric',
             'max_living_size' => 'nullable|numeric',
             'min_land_size' => 'nullable|numeric',
@@ -1826,20 +1623,15 @@ class PropertyApiController extends Controller
         ]);
     }
 
-    /**
-     * Get properties within a specified radius from a point
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function getPropertiesInRadius(Request $request)
+    public function getPropertiesInMapBounds(Request $request)
     {
         // Validate the request parameters
         $request->validate([
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'radius' => 'required|numeric|min:0.1|max:50', // radius in kilometers, with reasonable limits
-            'limit' => 'nullable|integer|min:1|max:50', // limit the number of results
+            'ne_lat' => 'required|numeric', // Northeast corner latitude
+            'ne_lng' => 'required|numeric', // Northeast corner longitude
+            'sw_lat' => 'required|numeric', // Southwest corner latitude
+            'sw_lng' => 'required|numeric', // Southwest corner longitude
+            'limit' => 'nullable|integer|min:1|max:200', // limit the number of results, max 200
             'page' => 'nullable|integer|min:1',
             'type' => 'nullable|string|in:buy,rent,all',
             'property_type' => 'nullable|string',
@@ -1855,33 +1647,55 @@ class PropertyApiController extends Controller
             'waterfront' => 'nullable|boolean',
             'min_year_built' => 'nullable|integer',
             'max_year_built' => 'nullable|integer',
+            'zoom_level' => 'nullable|numeric', // Map zoom level for clustering decisions
+            'sort_by' => 'nullable|string|in:ListPrice,DateListed,YearBuilt,BedroomsTotal,BathroomsTotalInteger,LivingArea', // Sorting field
+            'sort_dir' => 'nullable|string|in:asc,desc', // Sorting direction
         ]);
 
         // Get parameters from request
-        $latitude = $request->input('latitude');
-        $longitude = $request->input('longitude');
-        $radius = $request->input('radius'); // in kilometers
-        $limit = $request->input('limit', 10); // default to 10 properties
+        $neLat = $request->input('ne_lat');
+        $neLng = $request->input('ne_lng');
+        $swLat = $request->input('sw_lat');
+        $swLng = $request->input('sw_lng');
+        $limit = $request->input('limit', 200); // default
         $page = $request->input('page', 1);
         $type = $request->input('type', 'all');
+        $zoomLevel = $request->input('zoom_level');
+        $sortBy = $request->input('sort_by', 'ListPrice'); // Default sort by price
+        $sortDir = $request->input('sort_dir', 'desc'); // Default sort direction
 
-        // Calculate the distance using the Haversine formula in MySQL
-        // 6371 is the Earth's radius in kilometers
+        // Calculate offset here, so it's defined for all code paths
+
+        $offset = ($page - 1) * $limit;
+
+        // Start building the query
         $query = Property::with(['details', 'media'])
             ->select('properties.*')
-            ->selectRaw("
-            (6371 * acos(
-                cos(radians(?)) * 
-                cos(radians(latitude)) * 
-                cos(radians(longitude) - radians(?)) + 
-                sin(radians(?)) * 
-                sin(radians(latitude))
-            )) AS distance", [$latitude, $longitude, $latitude])
             ->whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->where('StandardStatus', 'Active')
-            ->having('distance', '<=', $radius)
-            ->orderBy('distance', 'asc');
+            ->where('StandardStatus', 'Active');
+
+        // Handle the international date line (when the map crosses the 180/-180 longitude line)
+        if ($neLng < $swLng) {
+            // Map view crosses the international date line
+            $query->where(function ($q) use ($neLat, $neLng, $swLat, $swLng) {
+                $q->where(function ($subQ) use ($neLat, $swLat, $swLng) {
+                    $subQ->where('longitude', '>=', $swLng)
+                        ->where('longitude', '<=', 180)
+                        ->where('latitude', '>=', $swLat)
+                        ->where('latitude', '<=', $neLat);
+                })->orWhere(function ($subQ) use ($neLat, $neLng, $swLat) {
+                    $subQ->where('longitude', '>=', -180)
+                        ->where('longitude', '<=', $neLng)
+                        ->where('latitude', '>=', $swLat)
+                        ->where('latitude', '<=', $neLat);
+                });
+            });
+        } else {
+            // Normal case - map view doesn't cross the international date line
+            $query->whereBetween('longitude', [$swLng, $neLng])
+                ->whereBetween('latitude', [$swLat, $neLat]);
+        }
 
         // Apply type filter if provided
         if ($type && $type !== 'all') {
@@ -1968,24 +1782,385 @@ class PropertyApiController extends Controller
         // Get the total count before pagination
         $totalCount = $query->count();
 
-        // Apply pagination
-        $offset = ($page - 1) * $limit;
-        $properties = $query->skip($offset)->take($limit)->get();
+        // Determine if we should cluster properties based on zoom level and count
+        $shouldCluster = $zoomLevel && $zoomLevel < 14 && $totalCount > 200;
+
+        $response = [];
+
+        if ($shouldCluster) {
+            // For lower zoom levels, cluster properties by grid cells
+            $gridSize = 0.01; // Grid cell size in degrees (adjust based on zoom level)
+            if ($zoomLevel < 10) $gridSize = 0.05;
+            else if ($zoomLevel < 12) $gridSize = 0.02;
+
+            // Use raw SQL to group properties by grid cells
+            $clusters = DB::select("
+                SELECT 
+                    FLOOR(latitude / ?) * ? as lat_grid,
+                    FLOOR(longitude / ?) * ? as lng_grid,
+                    COUNT(*) as property_count,
+                    AVG(latitude) as center_lat,
+                    AVG(longitude) as center_lng,
+                    MIN(ListPrice) as min_price,
+                    MAX(ListPrice) as max_price
+                FROM properties
+                WHERE 
+                    latitude IS NOT NULL AND
+                    longitude IS NOT NULL AND
+                    StandardStatus = 'Active' AND
+                    latitude BETWEEN ? AND ? AND
+                    longitude BETWEEN ? AND ?
+                GROUP BY lat_grid, lng_grid
+                ORDER BY property_count DESC
+                LIMIT ?
+            ", [$gridSize, $gridSize, $gridSize, $gridSize, $swLat, $neLat, $swLng, $neLng, $limit]);
+
+            $response['clusters'] = $clusters;
+            $response['is_clustered'] = true;
+        } else {
+            // For higher zoom levels or when there are fewer properties, return individual properties
+
+            // Apply sorting to get the "top" properties
+            // For buy properties, prioritize newer and more expensive properties
+            // For rent properties, prioritize newer and more affordable properties
+            if ($type === 'rent') {
+                // For rentals, people often look for affordable options
+                if ($sortBy === 'ListPrice') {
+                    $sortDir = $sortDir ?: 'asc'; // Default to ascending for rentals
+                }
+            } else {
+                // For sales, people often look at more expensive properties first
+                if ($sortBy === 'ListPrice') {
+                    $sortDir = $sortDir ?: 'desc'; // Default to descending for sales
+                }
+            }
+
+            // Apply the requested sorting
+            $query->orderBy($sortBy, $sortDir);
+
+            // Add secondary sorting for better results
+            if ($sortBy !== 'YearBuilt') {
+                $query->orderBy('YearBuilt', 'desc'); // Newer properties first
+            }
+
+            if ($sortBy !== 'BedroomsTotal') {
+                $query->orderBy('BedroomsTotal', 'desc'); // More bedrooms
+            }
+
+            // Apply pagination to get the top properties
+            $properties = $query->skip($offset)->take($limit)->get();
+
+            $response['properties'] = $properties;
+            $response['is_clustered'] = false;
+        }
 
         // Format the response
         return response()->json([
             'success' => true,
-            'data' => $properties,
+            'data' => $response,
             'meta' => [
                 'current_page' => (int)$page,
                 'per_page' => (int)$limit,
                 'total' => $totalCount,
                 'has_more' => ($offset + $limit) < $totalCount,
-                'center' => [
-                    'latitude' => (float)$latitude,
-                    'longitude' => (float)$longitude
+                'bounds' => [
+                    'northeast' => [
+                        'lat' => (float)$neLat,
+                        'lng' => (float)$neLng
+                    ],
+                    'southwest' => [
+                        'lat' => (float)$swLat,
+                        'lng' => (float)$swLng
+                    ]
                 ],
-                'radius' => (float)$radius
+                'zoom_level' => $zoomLevel
+            ]
+        ]);
+    }
+
+    // public function getAllProperties(Request $request)
+    // {
+    //     // Validate pagination parameters
+    //     $request->validate([
+    //         'limit' => 'nullable|integer|min:1|max:100',
+    //         'page' => 'nullable|integer|min:1',
+    //         'sort_by' => 'nullable|string|in:ListPrice,DateListed,BathroomsTotalInteger,BedroomsTotal,LivingArea,YearBuilt',
+    //         'sort_dir' => 'nullable|string|in:asc,desc',
+    //     ]);
+
+    //     // Get pagination parameters
+    //     $limit = $request->input('limit', 12); // Default to 10 items per page
+    //     $page = $request->input('page', 1); // Default to first page
+    //     $sortBy = $request->input('sort_by', 'ListPrice'); // Default sort by price
+    //     $sortDir = $request->input('sort_dir', 'desc'); // Default sort direction
+
+    //     // Build the query with minimal relations to improve performance
+    //     $query = Property::with(['media'])
+    //         ->where('StandardStatus', 'Active'); // Only include active properties
+
+    //     // Apply sorting
+    //     $query->orderBy($sortBy, $sortDir);
+
+    //     // Get paginated results
+    //     $properties = $query->paginate($limit);
+
+    //     // Format the response
+    //     return response()->json([
+    //         'success' => true,
+    //         'data' => $properties->items(),
+    //         'meta' => [
+    //             'current_page' => $properties->currentPage(),
+    //             'per_page' => $properties->perPage(),
+    //             'total' => $properties->total(),
+    //             'last_page' => $properties->lastPage(),
+    //             'has_more_pages' => $properties->hasMorePages()
+    //         ]
+    //     ]);
+    // }
+
+    public function getAllProperties(Request $request)
+    {
+        // Validate request parameters
+        $request->validate([
+            'limit' => 'nullable|integer|min:1|max:100',
+            'page' => 'nullable|integer|min:1',
+            'sort_by' => 'nullable|string|in:ListPrice,DateListed,BathroomsTotalInteger,BedroomsTotal,LivingArea,YearBuilt',
+            'sort_dir' => 'nullable|string|in:asc,desc',
+            'type' => 'nullable|string|in:buy,rent,all',
+            'property_type' => 'nullable|string',
+            'property_subtype' => 'nullable|string',
+            'min_price' => 'nullable|numeric',
+            'max_price' => 'nullable|numeric',
+            'min_beds' => 'nullable|integer',
+            'max_beds' => 'nullable|integer',
+            'min_baths' => 'nullable|integer',
+            'max_baths' => 'nullable|integer',
+            'beds' => 'nullable|integer',
+            'baths' => 'nullable|integer',
+            'min_living_size' => 'nullable|numeric',
+            'max_living_size' => 'nullable|numeric',
+            'min_land_size' => 'nullable|numeric',
+            'max_land_size' => 'nullable|numeric',
+            'min_year_built' => 'nullable|integer|min:1800|max:2025',
+            'max_year_built' => 'nullable|integer|min:1800|max:2025',
+            'waterfront' => 'nullable|boolean',
+            'waterfront_features' => 'nullable|string',
+            'swimming_pool' => 'nullable|boolean',
+            'tennis_court' => 'nullable|boolean',
+            'gated_community' => 'nullable|boolean',
+            'penthouse' => 'nullable|boolean',
+            'pets_allowed' => 'nullable|boolean',
+            'furnished' => 'nullable|boolean',
+            'golf_course' => 'nullable|boolean',
+            'boat_dock' => 'nullable|boolean',
+            'parking_spaces' => 'nullable|integer',
+        ]);
+
+        // Get pagination parameters
+        $limit = $request->input('limit', 12); // Default to 12 items per page
+        $page = $request->input('page', 1); // Default to first page
+        $sortBy = $request->input('sort_by', 'ListPrice'); // Default sort by price
+        $sortDir = $request->input('sort_dir', 'desc'); // Default sort direction
+        $type = $request->input('type', 'all'); // Default to all property types
+
+        // Build the query with relationships
+        $query = Property::with(['details', 'media', 'amenities', 'schools', 'financialDetails'])
+            ->where('StandardStatus', 'Active'); // Only include active properties
+
+        // Apply type filter if provided
+        if ($type && $type !== 'all') {
+            switch (strtolower($type)) {
+                case 'buy':
+                    // Properties for sale
+                    $query->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+                case 'rent':
+                    // Properties for rent
+                    $query->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    break;
+            }
+        }
+
+        // Apply property type filter if provided
+        if ($request->filled('property_type')) {
+            $query->where('PropertyType', $request->property_type);
+        }
+
+        // Apply property subtype filter if provided
+        if ($request->filled('property_subtype')) {
+            $query->where('PropertySubType', $request->property_subtype);
+        }
+
+        // Apply price filters if provided
+        if ($request->filled('min_price')) {
+            $query->where('ListPrice', '>=', $request->min_price);
+        }
+        if ($request->filled('max_price')) {
+            $query->where('ListPrice', '<=', $request->max_price);
+        }
+
+        // Apply bedroom filters if provided
+        if ($request->filled('min_beds')) {
+            $query->where('BedroomsTotal', '>=', $request->min_beds);
+        }
+        if ($request->filled('max_beds')) {
+            $query->where('BedroomsTotal', '<=', $request->max_beds);
+        }
+
+        // Apply bathroom filters if provided
+        if ($request->filled('min_baths')) {
+            $query->where('BathroomsTotalInteger', '>=', $request->min_baths);
+        }
+        if ($request->filled('max_baths')) {
+            $query->where('BathroomsTotalInteger', '<=', $request->max_baths);
+        }
+
+        // Apply living size filters if provided
+        if ($request->filled('min_living_size')) {
+            $query->where('LivingArea', '>=', $request->min_living_size);
+        }
+        if ($request->filled('max_living_size')) {
+            $query->where('LivingArea', '<=', $request->max_living_size);
+        }
+
+        // Apply land size filters if provided
+        if ($request->filled('min_land_size')) {
+            $query->where('LotSizeSquareFeet', '>=', $request->min_land_size);
+        }
+        if ($request->filled('max_land_size')) {
+            $query->where('LotSizeSquareFeet', '<=', $request->max_land_size);
+        }
+
+        // Apply year built filters if provided
+        if ($request->filled('min_year_built')) {
+            $query->where('YearBuilt', '>=', $request->min_year_built);
+        }
+        if ($request->filled('max_year_built')) {
+            $query->where('YearBuilt', '<=', $request->max_year_built);
+        }
+
+        // Apply waterfront filter if provided
+        if ($request->has('waterfront')) {
+            $waterfrontValue = filter_var($request->input('waterfront'), FILTER_VALIDATE_BOOLEAN);
+            // Check if the property has WaterfrontYN field matching the requested value
+            $query->whereHas('details', function ($q) use ($waterfrontValue) {
+                if ($waterfrontValue) {
+                    // If looking for waterfront properties
+                    $q->where('WaterfrontYN', true);
+                } else {
+                    // If looking for non-waterfront properties
+                    $q->where(function ($subQuery) {
+                        $subQuery->where('WaterfrontYN', false)
+                            ->orWhereNull('WaterfrontYN');
+                    });
+                }
+            });
+        }
+
+        // Apply waterfront features filter if provided
+        if ($request->filled('waterfront_features')) {
+            $waterfrontFeatures = $request->input('waterfront_features');
+            // Split the input by commas if multiple features are provided
+            $featuresArray = explode(',', $waterfrontFeatures);
+
+            $query->whereHas('details', function ($q) use ($featuresArray) {
+                foreach ($featuresArray as $feature) {
+                    $feature = trim($feature);
+                    if (!empty($feature)) {
+                        // Use LIKE query to find the feature in the comma-separated list
+                        $q->where('WaterfrontFeatures', 'LIKE', '%' . $feature . '%');
+                    }
+                }
+            });
+        }
+
+        // Apply swimming pool filter if provided
+        if ($request->has('swimming_pool') && $request->boolean('swimming_pool')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Swimming Pool%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Swimming Pool%')
+                    ->orWhere('PoolPrivateYN', true);
+            });
+        }
+
+        // Apply tennis court filter if provided
+        if ($request->has('tennis_court') && $request->boolean('tennis_court')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Tennis Court%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Tennis Court%');
+            });
+        }
+
+        // Apply gated community filter if provided
+        if ($request->has('gated_community') && $request->boolean('gated_community')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('CommunityFeatures', 'LIKE', '%Gated Community%')
+                    ->orWhere('AssociationAmenities', 'LIKE', '%Gated%');
+            });
+        }
+
+        // Apply penthouse filter if provided
+        if ($request->has('penthouse') && $request->boolean('penthouse')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Penthouse%')
+                    ->orWhere('PropertySubType', 'LIKE', '%Penthouse%');
+            });
+        }
+
+        // Apply pets allowed filter if provided
+        if ($request->has('pets_allowed') && $request->boolean('pets_allowed')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('PetsAllowed', true)
+                    ->orWhere('PetsAllowedYN', true);
+            });
+        }
+
+        // Apply furnished filter if provided
+        if ($request->has('furnished') && $request->boolean('furnished')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('Furnished', true);
+            });
+        }
+
+        // Apply golf course filter if provided
+        if ($request->has('golf_course') && $request->boolean('golf_course')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Golf Course%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Golf Course%');
+            });
+        }
+
+        // Apply boat dock filter if provided
+        if ($request->has('boat_dock') && $request->boolean('boat_dock')) {
+            $query->whereHas('amenities', function ($q) {
+                $q->where('AssociationAmenities', 'LIKE', '%Boat Dock%')
+                    ->orWhere('CommunityFeatures', 'LIKE', '%Boat Dock%');
+            });
+        }
+
+        // Apply parking spaces filter if provided
+        if ($request->has('parking_spaces') && is_numeric($request->input('parking_spaces'))) {
+            $query->whereHas('amenities', function ($q) use ($request) {
+                $q->where('ParkingTotal', '>=', $request->input('parking_spaces'));
+            });
+        }
+
+        // Apply sorting
+        $query->orderBy($sortBy, $sortDir);
+
+        // Get paginated results
+        $properties = $query->paginate($limit);
+
+        // Format the response
+        return response()->json([
+            'success' => true,
+            'data' => $properties->items(),
+            'meta' => [
+                'current_page' => $properties->currentPage(),
+                'per_page' => $properties->perPage(),
+                'total' => $properties->total(),
+                'last_page' => $properties->lastPage(),
+                'has_more_pages' => $properties->hasMorePages()
             ]
         ]);
     }
