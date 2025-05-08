@@ -46,4 +46,10 @@ return [
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
+    'bridge' => [
+        'url' => env('BRIDGE_API_URL', 'https://api.bridgedataoutput.com/api/v2'),
+        'key' => env('BRIDGE_API_KEY', "f091fc0d25a293957350aa6a022ea4fb"),
+        'endpoint' => env('BRIDGE_API_ENDPOINT', 'miamire/listings'),
+    ],
+
 ];
