@@ -118,8 +118,8 @@ class ImportPropertiesFromBridge extends Command
         'SignOnPropertyYN', 'HomeWarrantyYN', 'LeaseConsideredYN', 'LandLeaseYN',
         'LeaseAssignableYN', 'LeaseRenewalOptionYN', 'SeniorCommunityYN',
         'PropertyAttachedYN', 'ElectricOnPropertyYN', 'HabitableResidenceYN',
-        'AdditionalParcelsYN', 'IDXParticipationYN','InternetAddressDisplayYN','InternetEntireListingDisplayYN',
-    'InternetConsumerCommentYN'
+        'AdditionalParcelsYN', 'IDXParticipationYN', 'InternetAddressDisplayYN', 'InternetEntireListingDisplayYN',
+        'InternetConsumerCommentYN'
     ];
 
     /**
@@ -162,22 +162,22 @@ class ImportPropertiesFromBridge extends Command
             $continueProcessing = true;
 
             $this->info("Beginning batch processing...");
+            $nextUrl = null; // Start with the default (initial) request
+            $totalProcessed = 0;
 
-            // Process in batches until we're done or hit the maximum
-            while ($continueProcessing) {
-                // Fetch properties from Bridge API
-                $properties = $this->fetchPropertiesFromAPI($batchSize, $offset, $status);
+            while (true) {
+                $result = $this->fetchPropertiesFromAPI($batchSize, $nextUrl);
+                $properties = $result['properties'];
+                $nextUrl = $result['next']; // Get the next page URL
 
-                $fetchedCount = count($properties);
-
-                if (empty($properties) || $fetchedCount === 0) {
+                if (empty($properties)) {
                     $this->info('No more properties found to import.');
                     break;
                 }
 
-                $this->info("Batch: Processing {$fetchedCount} properties (offset: {$offset})");
+                $fetchedCount = count($properties);
+                $this->info("Batch: Processing {$fetchedCount} properties");
 
-                // Process each property in this batch
                 $this->withProgressBar($properties, function ($propertyData) use ($update) {
                     try {
                         DB::beginTransaction();
@@ -194,30 +194,21 @@ class ImportPropertiesFromBridge extends Command
                 });
 
                 $this->newLine();
-
-                // Update counters
                 $totalProcessed += $fetchedCount;
-                $offset += $fetchedCount;
+                $this->info("Total processed so far: {$totalProcessed}");
 
-                // Display batch stats
-                $this->info("Batch completed. Total processed so far: {$totalProcessed}");
-
-                // Check if we've reached the maximum number of records to process
                 if ($maxRecords > 0 && $totalProcessed >= $maxRecords) {
                     $this->info("Reached maximum number of records to process ({$maxRecords}).");
                     break;
                 }
 
-                // If we got fewer properties than requested, we've reached the end
-                if ($fetchedCount < $batchSize) {
-                    $this->info("Reached the end of available properties.");
+                if (!$nextUrl) {
+                    $this->info("No more pages to fetch.");
                     break;
                 }
 
-                // Optional: Add a small delay between batches to prevent API rate limiting
-                sleep(2);
+                sleep(2); // prevent rate limiting
             }
-
             $this->newLine(2);
             $this->displayStats();
 
@@ -240,22 +231,16 @@ class ImportPropertiesFromBridge extends Command
      * @param string $status
      * @return array
      */
-    protected function fetchPropertiesFromAPI($limit, $offset, $status)
+    protected function fetchPropertiesFromAPI($limit, $nextUrl = null)
     {
-        // The API key should be just the token value, not the full "BRIDGE_API_KEY=token" string
         $apiKey = config('services.bridge.key');
 
-        // Remove the "BRIDGE_API_KEY=" prefix if it exists
         if (strpos($apiKey, 'BRIDGE_API_KEY=') === 0) {
             $apiKey = substr($apiKey, 15);
         }
 
-        // $params = [
-        //     'limit' => $limit,
-        //     'offset' => $offset
-        // ];
-
-        $url = "https://api.bridgedataoutput.com/api/v2/miamire/listings?access_token=f091fc0d25a293957350aa6a022ea4fb&limit=$limit&offset=$offset";
+        // Build the initial request URL
+        $url = $nextUrl ?? "https://api.bridgedataoutput.com/api/v2/OData/miamire/Property?access_token=f091fc0d25a293957350aa6a022ea4fb";
 
         $response = Http::get($url);
 
@@ -264,15 +249,34 @@ class ImportPropertiesFromBridge extends Command
         }
 
         $data = $response->json();
-        return $data['bundle'] ?? [];
+        return [
+            'properties' => $data['value'] ?? [],
+            'next' => $data['@odata.nextLink'] ?? null,
+        ];
     }
-    /**
-     * Process a single property
-     *
-     * @param array $propertyData
-     * @param bool $update
-     * @return void
-     */
+
+    // protected function fetchPropertiesFromAPI($limit, $offset, $status)
+    // {
+    //     // The API key should be just the token value, not the full "BRIDGE_API_KEY=token" string
+    //     $apiKey = config('services.bridge.key');
+
+    //     // Remove the "BRIDGE_API_KEY=" prefix if it exists
+    //     if (strpos($apiKey, 'BRIDGE_API_KEY=') === 0) {
+    //         $apiKey = substr($apiKey, 15);
+    //     }
+
+    //     $url = "https://api.bridgedataoutput.com/api/v2/miamire/listings?access_token=f091fc0d25a293957350aa6a022ea4fb&limit=$limit";
+
+    //     $response = Http::get($url);
+
+    //     if (!$response->successful()) {
+    //         throw new \Exception("API request failed: " . $response->body());
+    //     }
+
+    //     $data = $response->json();
+    //     return $data['bundle'] ?? [];
+    // }
+
     protected function processProperty($propertyData, $update)
     {
         try {
@@ -336,7 +340,6 @@ class ImportPropertiesFromBridge extends Command
 
             // Process lease information
             $this->processPropertyLeaseInformation($property, $propertyData);
-
         } catch (\Exception $e) {
             $this->stats['failed']++;
             $this->error("Error processing property {$listingKey}: " . $e->getMessage());
@@ -892,7 +895,7 @@ class ImportPropertiesFromBridge extends Command
         $details = BridgePropertyDetail::firstOrNew(['property_id' => $property->id]);
 
         // Helper function to safely convert any value to a string
-        $safeToString = function($value) {
+        $safeToString = function ($value) {
             if (is_array($value)) {
                 return json_encode($value);
             } elseif (is_null($value)) {
@@ -908,9 +911,9 @@ class ImportPropertiesFromBridge extends Command
         // Map all fields from the API to our database columns
         $fieldMappings = [
             'building_name' => 'BuildingName',
-            'builder_model'=> 'BuilderModel',
-            'buisness_name'=> 'BusinessName',
-            'buisness_type'=> 'BusinessType',
+            'builder_model' => 'BuilderModel',
+            'buisness_name' => 'BusinessName',
+            'buisness_type' => 'BusinessType',
             'subdivision_name' => 'SubdivisionName',
             'building_area_total' => 'BuildingAreaTotal',
             'building_area_units' => 'BuildingAreaUnits',
@@ -994,12 +997,12 @@ class ImportPropertiesFromBridge extends Command
 
         // Special handling for boolean fields
         $booleanFields = [
-            'sign_on_property_yn', 
-            'association_yn', 
+            'sign_on_property_yn',
+            'association_yn',
             'home_warranty_yn',
-            'miamire_pool_yn', 
+            'miamire_pool_yn',
             'miamire_membership_purch_rqd_yn',
-            'miamire_special_assessment_yn', 
+            'miamire_special_assessment_yn',
             'miamire_seller_contributions_yn',
             'miamire_for_lease_yn',
             'miamire_for_sale_yn',
@@ -1016,9 +1019,9 @@ class ImportPropertiesFromBridge extends Command
 
         // Special handling for numeric fields
         $numericFields = [
-            'building_area_total', 
+            'building_area_total',
             'miamire_adjusted_area_sf',
-            'miamire_lp_amt_sq_ft', 
+            'miamire_lp_amt_sq_ft',
             'miamire_ratio_current_price_by_sqft',
             'miamire_seller_contributions_amt',
             'miamire_application_fee',

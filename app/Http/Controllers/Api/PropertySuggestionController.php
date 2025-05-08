@@ -3,32 +3,149 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\BridgeProperty;
 use App\Models\Property;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class PropertySuggestionController extends Controller
 {
+    // public function index(Request $request)
+    // {
+    //     $query = $request->input('q');
+
+    //     if (empty($query) || strlen($query) < 1) {
+    //         return response()->json([]);
+    //     }
+
+    //     // Search for properties that match the query in various fields
+    //     $properties = Property::where(function ($q) use ($query) {
+    //         $q->where('UnparsedAddress', 'like', "%{$query}%")
+    //             ->orWhere('City', 'like', "%{$query}%")
+    //             ->orWhere('StateOrProvince', 'like', "%{$query}%")
+    //             ->orWhere('PostalCode', 'like', "%{$query}%");
+    //     })
+    //         ->select('id', 'UnparsedAddress', 'City', 'StateOrProvince', 'PostalCode')
+    //         ->limit(5)
+    //         ->get();
+
+    //     return response()->json($properties);
+    // }
+
+    // public function index(Request $request)
+    // {
+    //     $query = $request->input('q');
+
+    //     if (empty($query) || strlen($query) < 1) {
+    //         return response()->json([]);
+    //     }
+
+    //     // Search for properties that match the query in various fields
+    //     $properties = BridgeProperty::where(function ($q) use ($query) {
+    //         $q->where('unparsed_address', 'like', "%{$query}%")
+    //             ->orWhere('city', 'like', "%{$query}%")
+    //             ->orWhere('state_or_province', 'like', "%{$query}%")
+    //             ->orWhere('postal_code', 'like', "%{$query}%");
+    //     })
+    //         ->select('id', 'unparsed_address', 'city', 'state_or_province', 'postal_code')
+    //         ->limit(5)
+    //         ->get();
+
+    //     return response()->json($properties);
+    // }
+
+
     public function index(Request $request)
     {
         $query = $request->input('q');
-
+    
         if (empty($query) || strlen($query) < 1) {
             return response()->json([]);
         }
-
+    
         // Search for properties that match the query in various fields
-        $properties = Property::where(function ($q) use ($query) {
-            $q->where('UnparsedAddress', 'like', "%{$query}%")
-                ->orWhere('City', 'like', "%{$query}%")
-                ->orWhere('StateOrProvince', 'like', "%{$query}%")
-                ->orWhere('PostalCode', 'like', "%{$query}%");
+        $properties = BridgeProperty::where(function ($q) use ($query) {
+            $q->where('unparsed_address', 'like', "%{$query}%")
+                ->orWhere('street_number', 'like', "%{$query}%")
+                ->orWhere('street_name', 'like', "%{$query}%")
+                ->orWhere('city', 'like', "%{$query}%")
+                ->orWhere('state_or_province', 'like', "%{$query}%")
+                ->orWhere('postal_code', 'like', "%{$query}%");
         })
-            ->select('id', 'UnparsedAddress', 'City', 'StateOrProvince', 'PostalCode')
+            ->select('id', 'unparsed_address', 'street_number', 'street_name', 'city', 'state_or_province', 'postal_code')
+            ->limit(10)
+            ->get()
+            ->map(function ($property) {
+                return [
+                    'id' => $property->id,
+                    'label' => "{$property->street_number} {$property->street_name}, {$property->city}, {$property->state_or_province} {$property->postal_code}",
+                    'unparsed_address' => $property->unparsed_address,
+                    'street_number' => $property->street_number,
+                    'street_name' => $property->street_name,
+                    'city' => $property->city,
+                    'state_or_province' => $property->state_or_province,
+                    'postal_code' => $property->postal_code,
+                    'type' => 'property'
+                ];
+            });
+    
+        // Also search for unique cities
+        $cities = BridgeProperty::where('city', 'like', "%{$query}%")
+            ->whereNotNull('city')
+            ->where('city', '!=', '')
+            ->select('city', 'state_or_province')
+            ->distinct()
             ->limit(5)
-            ->get();
-
-        return response()->json($properties);
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => null,
+                    'label' => "{$item->city}, {$item->state_or_province}",
+                    'city' => $item->city,
+                    'state_or_province' => $item->state_or_province,
+                    'type' => 'city'
+                ];
+            });
+    
+        // Search for states
+        $states = BridgeProperty::where('state_or_province', 'like', "%{$query}%")
+            ->whereNotNull('state_or_province')
+            ->where('state_or_province', '!=', '')
+            ->select('state_or_province')
+            ->distinct()
+            ->limit(3)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => null,
+                    'label' => $item->state_or_province,
+                    'state_or_province' => $item->state_or_province,
+                    'type' => 'state'
+                ];
+            });
+    
+        // Search for postal codes
+        $postalCodes = BridgeProperty::where('postal_code', 'like', "%{$query}%")
+            ->whereNotNull('postal_code')
+            ->where('postal_code', '!=', '')
+            ->select('postal_code', 'state_or_province')
+            ->distinct()
+            ->limit(3)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => null,
+                    'label' => "{$item->postal_code}, {$item->state_or_province}",
+                    'postal_code' => $item->postal_code,
+                    'state_or_province' => $item->state_or_province,
+                    'type' => 'postal_code'
+                ];
+            });
+    
+        // Combine all results
+        $results = $properties->concat($cities)->concat($states)->concat($postalCodes);
+    
+        return response()->json($results);
     }
 
     public function suggestion(Request $request)
@@ -553,7 +670,7 @@ class PropertySuggestionController extends Controller
         return $states[strtoupper($abbr)] ?? null;
     }
 
-    
+
     public function autocomplete(Request $request)
     {
         // Get search parameters - support both 'q' and 'query' parameters
@@ -698,7 +815,7 @@ class PropertySuggestionController extends Controller
                 ->orWhere('StreetName', 'like', "%{$query}%")
                 ->orWhere('City', 'like', "%{$query}%");
         })
-            ->groupBy('StreetNumber', 'StreetName','StreetDirPrefix', 'City', 'StateOrProvince', 'PostalCode', 'BuildingName')
+            ->groupBy('StreetNumber', 'StreetName', 'StreetDirPrefix', 'City', 'StateOrProvince', 'PostalCode', 'BuildingName')
             ->havingRaw('COUNT(*) > 1')
             ->orderByRaw("CASE 
             WHEN CONCAT(StreetNumber, ' ', StreetName) LIKE '{$query}%' THEN 1
@@ -708,9 +825,9 @@ class PropertySuggestionController extends Controller
             ->limit($buildingLimit)
             ->get()
             ->map(function ($item) {
-                $address = trim($item->StreetNumber . ' ' . 
-            ($item->StreetDirPrefix ? $item->StreetDirPrefix . ' ' : '') . 
-            $item->StreetName);
+                $address = trim($item->StreetNumber . ' ' .
+                    ($item->StreetDirPrefix ? $item->StreetDirPrefix . ' ' : '') .
+                    $item->StreetName);
                 $buildingName = !empty($item->BuildingName) ? $item->BuildingName : $address;
 
                 return [
@@ -780,11 +897,11 @@ class PropertySuggestionController extends Controller
             });
 
         $postalCodeSuggestions = DB::table('properties')
-            ->select('PostalCode','StateOrProvince')
+            ->select('PostalCode', 'StateOrProvince')
             ->where('PostalCode', 'like', "%{$query}%")
             ->whereNotNull('PostalCode')
             ->where('PostalCode', '!=', '')
-            ->groupBy('PostalCode','StateOrProvince')
+            ->groupBy('PostalCode', 'StateOrProvince')
             ->orderByRaw("CASE WHEN PostalCode LIKE '{$query}%' THEN 1 ELSE 2 END")
             ->limit($placeLimit)
             ->get()
@@ -834,5 +951,4 @@ class PropertySuggestionController extends Controller
             'suggestions' => $groupedSuggestions
         ]);
     }
-    
 }

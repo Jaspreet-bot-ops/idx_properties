@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BridgeProperty;
 use App\Models\Property;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -88,91 +89,111 @@ class PropertyController extends Controller
         return $states[$state] ?? $state;
     }
 
-    /**
-     * Display a listing of the resource.
-     */
     // public function index(Request $request)
     // {
     //     $query = Property::query();
 
     //     // Search functionality
     //     if ($request->has('search') && !empty($request->search)) {
-    //         $searchTerm = $request->search;
+    //         $searchTerm = trim($request->search);
 
-    //         // Check if the search term contains commas (like "City, State, Country")
-    //         if (strpos($searchTerm, ',') !== false) {
-    //             $parts = array_map('trim', explode(',', $searchTerm));
+    //         $parts = array_map('trim', explode(',', $searchTerm));
+    //         $partsCount = count($parts);
 
-    //             // Extract city, state, and country
-    //             $city = isset($parts[0]) ? $parts[0] : null;
-    //             $state = isset($parts[1]) ? $parts[1] : null;
-    //             $country = isset($parts[2]) ? $parts[2] : null;
+    //         $street = null;
+    //         $city = null;
+    //         $state = null;
+    //         $postalCode = null;
+    //         $country = null;
 
-    //             // Convert state name to abbreviation if needed
-    //             $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
+    //         // Handle different address input patterns
+    //         if ($partsCount >= 1) {
+    //             $streetOrCity = $parts[0];
 
-    //             // Build a more precise query with AND conditions between parts
-    //             $query->where(function($q) use ($city, $stateAbbr, $country) {
-    //                 // Start with the city - this is required
-
-
-    //                 if ($city) {
-    //                     $q->where('City', 'like', "{$city}%");
-    //                 }
-
-    //                 // Add state condition if provided
-    //                 if ($stateAbbr) {
-    //                     $q->where('StateOrProvince', 'like', "{$stateAbbr}%");
-    //                 }
-
-    //                 // Add country condition if provided
-    //                 if ($country) {
-    //                     $q->where('country', 'like', "%{$country}%");
-    //                 }
-    //             });
-    //         } else {
-    //             // For single term searches, try to match exactly on common fields
-    //             $query->where(function($q) use ($searchTerm) {
-    //                 $q->where('City', $searchTerm)
-    //                   ->orWhere('PostalCode', $searchTerm)
-    //                   ->orWhere('UnparsedAddress', 'like', "%{$searchTerm}%")
-    //                   ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$searchTerm}%");
-
-    //                 // Check if it might be a state
-    //                 $stateAbbr = $this->getStateAbbreviation($searchTerm);
-    //                 if ($stateAbbr !== $searchTerm) {
-    //                     $q->orWhere('StateOrProvince', $stateAbbr);
-    //                 } else {
-    //                     $q->orWhere('StateOrProvince', $searchTerm);
-    //                 }
-    //             });
+    //             // If it's a full address, like "400 Sunny Isles Blvd 119"
+    //             if (preg_match('/\d+/', $streetOrCity)) {
+    //                 $street = $streetOrCity;
+    //             } else {
+    //                 $city = $streetOrCity;
+    //             }
     //         }
+
+    //         if ($partsCount >= 2) {
+    //             $city = $parts[1];
+    //         }
+
+    //         if ($partsCount >= 3) {
+    //             $state = $parts[2];
+    //         }
+
+    //         if ($partsCount >= 4) {
+    //             // Either a postal code or a country
+    //             if (preg_match('/\d{4,}/', $parts[3])) {
+    //                 $postalCode = $parts[3];
+    //             } else {
+    //                 $country = $parts[3];
+    //             }
+    //         }
+
+    //         if ($partsCount >= 5) {
+    //             $country = $parts[4];
+    //         }
+
+    //         // Convert full state to abbreviation if needed
+    //         $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
+
+    //         $query->where(function ($q) use ($street, $city, $stateAbbr, $postalCode, $country) {
+    //             if ($street) {
+    //                 $q->where(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$street}%")
+    //                     ->orWhere('UnparsedAddress', 'like', "%{$street}%");
+    //             }
+
+    //             if ($city) {
+    //                 $q->where('City', 'like', "%{$city}%");
+    //             }
+
+    //             if ($stateAbbr) {
+    //                 $q->where('StateOrProvince', 'like', "{$stateAbbr}%");
+    //             }
+
+    //             if ($postalCode) {
+    //                 $q->where('PostalCode', 'like', "%{$postalCode}%");
+    //             }
+
+    //             if ($country) {
+    //                 $q->where('country', 'like', "%{$country}%");
+    //             }
+    //         });
     //     }
 
-    //     // Filter by specific address components if needed
-    //     if ($request->has('street_number') && !empty($request->street_number)) {
+    //     // Individual filters (optional)
+    //     if ($request->filled('street_number')) {
     //         $query->where('StreetNumber', 'like', "%{$request->street_number}%");
     //     }
 
-    //     if ($request->has('street_name') && !empty($request->street_name)) {
+    //     if ($request->filled('street_name')) {
     //         $query->where('StreetName', 'like', "%{$request->street_name}%");
     //     }
 
-    //     if ($request->has('postal_code') && !empty($request->postal_code)) {
+    //     if ($request->filled('postal_code')) {
     //         $query->where('PostalCode', 'like', "%{$request->postal_code}%");
     //     }
 
-    //     if ($request->has('city') && !empty($request->city)) {
+    //     if ($request->filled('city')) {
     //         $query->where('City', 'like', "%{$request->city}%");
     //     }
 
-    //     if ($request->has('country') && !empty($request->country)) {
+    //     if ($request->filled('country')) {
     //         $query->where('country', 'like', "%{$request->country}%");
     //     }
 
+    //     $sortBy = $request->get('sort_by', 'PropertyType'); // Default sort by 'PropertyType'
+    //     $sortDirection = $request->get('sort_direction', 'asc'); // Default sort direction is 'asc'
+
+    //     $query->orderBy($sortBy, $sortDirection);
+
     //     $properties = $query->paginate(10);
 
-    //     // If this is an AJAX request, return JSON
     //     if ($request->ajax()) {
     //         return response()->json([
     //             'html' => view('partials.properties-table', compact('properties'))->render(),
@@ -183,120 +204,299 @@ class PropertyController extends Controller
     //     return view('properties', compact('properties'));
     // }
 
+    // public function index(Request $request)
+    // {
+    //     $query = BridgeProperty::query();
+
+    //     // Search functionality
+    //     if ($request->has('search') && !empty($request->search)) {
+    //         $searchTerm = trim($request->search);
+
+    //         $parts = array_map('trim', explode(',', $searchTerm));
+    //         $partsCount = count($parts);
+
+    //         $street = null;
+    //         $city = null;
+    //         $state = null;
+    //         $postalCode = null;
+    //         $country = null;
+
+    //         // Handle different address input patterns
+    //         if ($partsCount >= 1) {
+    //             $streetOrCity = $parts[0];
+
+    //             // If it's a full address, like "400 Sunny Isles Blvd 119"
+    //             if (preg_match('/\d+/', $streetOrCity)) {
+    //                 $street = $streetOrCity;
+    //             } else {
+    //                 $city = $streetOrCity;
+    //             }
+    //         }
+
+    //         if ($partsCount >= 2) {
+    //             $city = $parts[1];
+    //         }
+
+    //         if ($partsCount >= 3) {
+    //             $state = $parts[2];
+    //         }
+
+    //         if ($partsCount >= 4) {
+    //             // Either a postal code or a country
+    //             if (preg_match('/\d{4,}/', $parts[3])) {
+    //                 $postalCode = $parts[3];
+    //             } else {
+    //                 $country = $parts[3];
+    //             }
+    //         }
+
+    //         if ($partsCount >= 5) {
+    //             $country = $parts[4];
+    //         }
+
+    //         // Convert full state to abbreviation if needed
+    //         $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
+
+    //         $query->where(function ($q) use ($street, $city, $stateAbbr, $postalCode, $country) {
+    //             if ($street) {
+    //                 $q->where(DB::raw("CONCAT(street_number, ' ', street_name)"), 'like', "%{$street}%")
+    //                     ->orWhere('unparsed_address', 'like', "%{$street}%");
+    //             }
+
+    //             if ($city) {
+    //                 $q->where('city', 'like', "%{$city}%");
+    //             }
+
+    //             if ($stateAbbr) {
+    //                 $q->where('state_or_province', 'like', "{$stateAbbr}%");
+    //             }
+
+    //             if ($postalCode) {
+    //                 $q->where('postal_code', 'like', "%{$postalCode}%");
+    //             }
+
+    //             if ($country) {
+    //                 $q->where('country', 'like', "%{$country}%");
+    //             }
+    //         });
+    //     }
+
+    //     // Individual filters (optional)
+    //     if ($request->filled('street_number')) {
+    //         $query->where('street_number', 'like', "%{$request->street_number}%");
+    //     }
+
+    //     if ($request->filled('street_name')) {
+    //         $query->where('street_name', 'like', "%{$request->street_name}%");
+    //     }
+
+    //     if ($request->filled('postal_code')) {
+    //         $query->where('postal_code', 'like', "%{$request->postal_code}%");
+    //     }
+
+    //     if ($request->filled('city')) {
+    //         $query->where('city', 'like', "%{$request->city}%");
+    //     }
+
+    //     if ($request->filled('country')) {
+    //         $query->where('country', 'like', "%{$request->country}%");
+    //     }
+
+    //     $sortBy = $request->get('sort_by', 'property_type'); // Default sort by 'property_type'
+    //     $sortDirection = $request->get('sort_direction', 'asc'); // Default sort direction is 'asc'
+
+    //     $query->orderBy($sortBy, $sortDirection);
+
+    //     $properties = $query->paginate(10);
+
+    //     if ($request->ajax()) {
+    //         return response()->json([
+    //             'html' => view('partials.properties-table', compact('properties'))->render(),
+    //             'pagination' => view('partials.pagination', compact('properties'))->render(),
+    //         ]);
+    //     }
+
+    //     return view('properties', compact('properties'));
+    // }
+
+    // public function index(Request $request)
+    // {
+    //     $search = $request->input('search');
+    //     $sortBy = $request->input('sort_by', 'id');
+    //     $sortDirection = $request->input('sort_direction', 'desc');
+        
+    //     $query = BridgeProperty::query();
+        
+    //     // Apply search filter if provided
+    //     if ($search) {
+    //         // Check if this is a property_id search
+    //         if (preg_match('/property_id:(\d+)/', $search, $matches)) {
+    //             // If we have a property ID, just search for that specific property
+    //             $propertyId = $matches[1];
+    //             $query->where('id', $propertyId);
+    //         }
+    //         // Check if this is a street search
+    //         else if (preg_match('/street:(.+)/', $search, $matches)) {
+    //             $streetInfo = trim($matches[1]);
+                
+    //             // Try to extract street number and name
+    //             if (preg_match('/^(\d+)\s+(.+)$/', $streetInfo, $streetMatches)) {
+    //                 $streetNumber = $streetMatches[1];
+    //                 $streetName = trim($streetMatches[2]);
+                    
+    //                 // Search for properties with this street number and name
+    //                 $query->where('street_number', $streetNumber)
+    //                       ->where('street_name', 'like', $streetName . '%');
+    //             } else {
+    //                 // If we couldn't parse it, just search the street name
+    //                 $query->where('street_name', 'like', '%' . $streetInfo . '%');
+    //             }
+    //         }
+    //         // Check if this is a city search
+    //         else if (preg_match('/^([^,]+),\s*([A-Z]{2})$/', $search, $matches)) {
+    //             $city = trim($matches[1]);
+    //             $state = $matches[2];
+    //             $query->where('city', $city)
+    //                   ->where('state_or_province', $state);
+    //         }
+    //         // Check if this is a state search
+    //         else if (preg_match('/^([A-Z]{2})$/', $search, $matches)) {
+    //             $state = $matches[1];
+    //             $query->where('state_or_province', $state);
+    //         }
+    //         // Check if this is a postal code search
+    //         else if (preg_match('/^(\d{5}),\s*([A-Z]{2})$/', $search, $matches)) {
+    //             $postalCode = $matches[1];
+    //             $state = $matches[2];
+    //             $query->where('postal_code', $postalCode)
+    //                   ->where('state_or_province', $state);
+    //         }
+    //         // Check if this might be a street number and name without our prefix
+    //         else if (preg_match('/^(\d+)\s+(.+)$/', $search, $streetMatches)) {
+    //             $streetNumber = $streetMatches[1];
+    //             $streetName = trim($streetMatches[2]);
+                
+    //             // If it looks like a street address (number followed by text)
+    //             $query->where(function($q) use ($streetNumber, $streetName, $search) {
+    //                 // Try exact match on street number and name
+    //                 $q->where(function($sq) use ($streetNumber, $streetName) {
+    //                     $sq->where('street_number', $streetNumber)
+    //                        ->where('street_name', 'like', $streetName . '%');
+    //                 })
+    //                 // Or try matching the full unparsed address
+    //                 ->orWhere('unparsed_address', 'like', '%' . $search . '%');
+    //             });
+    //         }
+    //         // General search
+    //         else {
+    //             $query->where(function($q) use ($search) {
+    //                 $q->where('unparsed_address', 'like', "%{$search}%")
+    //                   ->orWhere('street_number', 'like', "%{$search}%")
+    //                   ->orWhere('street_name', 'like', "%{$search}%")
+    //                   ->orWhere('city', 'like', "%{$search}%")
+    //                   ->orWhere('state_or_province', 'like', "%{$search}%")
+    //                   ->orWhere('postal_code', 'like', "%{$search}%");
+    //             });
+    //         }
+    //     }
+        
+    //     // Apply sorting
+    //     $query->orderBy($sortBy, $sortDirection);
+        
+    //     // Get paginated results
+    //     $properties = $query->paginate(15)->withQueryString();
+        
+    //     return view('properties', compact('properties'));
+    // }     
+
     public function index(Request $request)
     {
-        $query = Property::query();
-
-        // Search functionality
-        if ($request->has('search') && !empty($request->search)) {
-            $searchTerm = trim($request->search);
-
-            $parts = array_map('trim', explode(',', $searchTerm));
-            $partsCount = count($parts);
-
-            $street = null;
-            $city = null;
-            $state = null;
-            $postalCode = null;
-            $country = null;
-
-            // Handle different address input patterns
-            if ($partsCount >= 1) {
-                $streetOrCity = $parts[0];
-
-                // If it's a full address, like "400 Sunny Isles Blvd 119"
-                if (preg_match('/\d+/', $streetOrCity)) {
-                    $street = $streetOrCity;
-                } else {
-                    $city = $streetOrCity;
-                }
+        $search = $request->input('search');
+        $propertyId = $request->input('property_id'); // Get property_id from request
+        $sortBy = $request->input('sort_by', 'id');
+        $sortDirection = $request->input('sort_direction', 'desc');
+        
+        $query = BridgeProperty::query();
+        
+        // If we have a specific property ID, use that for exact matching
+        if ($propertyId) {
+            $query->where('id', $propertyId);
+        }
+        // Otherwise, apply search filter if provided
+        else if ($search) {
+            // Check if this is a city search
+            if (preg_match('/^([^,]+),\s*([A-Z]{2})$/', $search, $matches)) {
+                $city = trim($matches[1]);
+                $state = $matches[2];
+                $query->where('city', $city)
+                      ->where('state_or_province', $state);
             }
-
-            if ($partsCount >= 2) {
-                $city = $parts[1];
+            // Check if this is a state search
+            else if (preg_match('/^([A-Z]{2})$/', $search, $matches)) {
+                $state = $matches[1];
+                $query->where('state_or_province', $state);
             }
-
-            if ($partsCount >= 3) {
-                $state = $parts[2];
+            // Check if this is a postal code search
+            else if (preg_match('/^(\d{5}),\s*([A-Z]{2})$/', $search, $matches)) {
+                $postalCode = $matches[1];
+                $state = $matches[2];
+                $query->where('postal_code', $postalCode)
+                      ->where('state_or_province', $state);
             }
-
-            if ($partsCount >= 4) {
-                // Either a postal code or a country
-                if (preg_match('/\d{4,}/', $parts[3])) {
-                    $postalCode = $parts[3];
-                } else {
-                    $country = $parts[3];
-                }
+            // Check if this might be a street address with city, state, postal code
+            else if (preg_match('/^(\d+)\s+([^,]+),\s*([^,]+),\s*([A-Z]{2})\s*(\d{5})$/', $search, $addressMatches)) {
+                $streetNumber = $addressMatches[1];
+                $streetName = trim($addressMatches[2]);
+                $city = trim($addressMatches[3]);
+                $state = $addressMatches[4];
+                $postalCode = $addressMatches[5];
+                
+                $query->where(function($q) use ($streetNumber, $streetName, $city, $state, $postalCode) {
+                    $q->where('street_number', $streetNumber)
+                      ->where('street_name', 'like', $streetName . '%')
+                      ->where('city', $city)
+                      ->where('state_or_province', $state)
+                      ->where('postal_code', $postalCode);
+                });
             }
-
-            if ($partsCount >= 5) {
-                $country = $parts[4];
+            // Check if this might be a street number and name without city/state
+            else if (preg_match('/^(\d+)\s+(.+)$/', $search, $streetMatches)) {
+                $streetNumber = $streetMatches[1];
+                $streetName = trim($streetMatches[2]);
+                
+                // If it looks like a street address (number followed by text)
+                $query->where(function($q) use ($streetNumber, $streetName, $search) {
+                    // Try exact match on street number and name
+                    $q->where(function($sq) use ($streetNumber, $streetName) {
+                        $sq->where('street_number', $streetNumber)
+                           ->where('street_name', 'like', $streetName . '%');
+                    })
+                    // Or try matching the full unparsed address
+                    ->orWhere('unparsed_address', 'like', '%' . $search . '%');
+                });
             }
-
-            // Convert full state to abbreviation if needed
-            $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
-
-            $query->where(function ($q) use ($street, $city, $stateAbbr, $postalCode, $country) {
-                if ($street) {
-                    $q->where(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$street}%")
-                        ->orWhere('UnparsedAddress', 'like', "%{$street}%");
-                }
-
-                if ($city) {
-                    $q->where('City', 'like', "%{$city}%");
-                }
-
-                if ($stateAbbr) {
-                    $q->where('StateOrProvince', 'like', "{$stateAbbr}%");
-                }
-
-                if ($postalCode) {
-                    $q->where('PostalCode', 'like', "%{$postalCode}%");
-                }
-
-                if ($country) {
-                    $q->where('country', 'like', "%{$country}%");
-                }
-            });
+            // General search
+            else {
+                $query->where(function($q) use ($search) {
+                    $q->where('unparsed_address', 'like', "%{$search}%")
+                      ->orWhere('street_number', 'like', "%{$search}%")
+                      ->orWhere('street_name', 'like', "%{$search}%")
+                      ->orWhere('city', 'like', "%{$search}%")
+                      ->orWhere('state_or_province', 'like', "%{$search}%")
+                      ->orWhere('postal_code', 'like', "%{$search}%");
+                });
+            }
         }
-
-        // Individual filters (optional)
-        if ($request->filled('street_number')) {
-            $query->where('StreetNumber', 'like', "%{$request->street_number}%");
-        }
-
-        if ($request->filled('street_name')) {
-            $query->where('StreetName', 'like', "%{$request->street_name}%");
-        }
-
-        if ($request->filled('postal_code')) {
-            $query->where('PostalCode', 'like', "%{$request->postal_code}%");
-        }
-
-        if ($request->filled('city')) {
-            $query->where('City', 'like', "%{$request->city}%");
-        }
-
-        if ($request->filled('country')) {
-            $query->where('country', 'like', "%{$request->country}%");
-        }
-
-        $sortBy = $request->get('sort_by', 'PropertyType'); // Default sort by 'PropertyType'
-        $sortDirection = $request->get('sort_direction', 'asc'); // Default sort direction is 'asc'
-    
+        
+        // Apply sorting
         $query->orderBy($sortBy, $sortDirection);
         
-        $properties = $query->paginate(10);
-
-        if ($request->ajax()) {
-            return response()->json([
-                'html' => view('partials.properties-table', compact('properties'))->render(),
-                'pagination' => view('partials.pagination', compact('properties'))->render(),
-            ]);
-        }
-
+        // Get paginated results
+        $properties = $query->paginate(15)->withQueryString();
+        
         return view('properties', compact('properties'));
     }
+    
 
     /**
      * Show the form for creating a new resource.
@@ -326,18 +526,37 @@ class PropertyController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Property $property)
+    public function show(BridgeProperty $property)
     {
+        // Load all relationships to ensure complete data is available in the view
         $property->load([
             'details',
             'amenities',
             'media',
             'schools',
             'financialDetails',
+            'listAgent',
+            'coListAgent',
+            'buyerAgent',
+            'coBuyerAgent',
+            'listOffice',
+            'coListOffice',
+            'buyerOffice',
+            'coBuyerOffice',
+            'elementarySchool',
+            'middleSchool',
+            'highSchool',
+            'features'
         ]);
-
-        return view('properties-show', compact('property'));
-    }
+        
+        // Get all features grouped by category for easy display
+        $featuresGrouped = null;
+        if ($property->features && $property->features->count() > 0) {
+            $featuresGrouped = $property->features->groupBy('category');
+        }
+        
+        return view('properties-show', compact('property', 'featuresGrouped'));
+    }    
 
     /**
      * Show the form for editing the specified resource.
