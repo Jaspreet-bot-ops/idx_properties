@@ -119,7 +119,7 @@ class ImportPropertiesFromBridge extends Command
         'LeaseAssignableYN', 'LeaseRenewalOptionYN', 'SeniorCommunityYN',
         'PropertyAttachedYN', 'ElectricOnPropertyYN', 'HabitableResidenceYN',
         'AdditionalParcelsYN', 'IDXParticipationYN','InternetAddressDisplayYN','InternetEntireListingDisplayYN',
-        'InternetEntireListingDisplayYN', 'InternetConsumerCommentYN'
+    'InternetConsumerCommentYN'
     ];
 
     /**
