@@ -250,7 +250,7 @@
             <div class="flex justify-between items-center">
                 <div>
                     <h1 class="admin-title">Property Details</h1>
-                    <p class="admin-subtitle">ID: {{ $property->id }} | Listing Key: {{ $property->ListingKey }}</p>
+                    <p class="admin-subtitle">ID: {{ $property->id }} | Listing Key: {{ $property->listing_key }}</p>
                 </div>
                 <div class="flex gap-2">
                     <a href="{{ route('properties') }}" class="admin-action-btn">
@@ -1690,190 +1690,226 @@
                 <div class="admin-card-body">
                     <div class="admin-data-list">
                         <div class="admin-section-title">Bridge Identifiers</div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Listing Key</div>
-                            <div class="admin-data-value">{{ $property->ListingKey ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->listing_key ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Listing ID</div>
-                            <div class="admin-data-value">{{ $property->ListingId ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->listing_id ?? 'N/A' }}</div>
                         </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">MLS Number</div>
-                            <div class="admin-data-value">{{ $property->MLSNumber ?? 'N/A' }}</div>
-                        </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">MLS Status</div>
-                            <div class="admin-data-value">{{ $property->MlsStatus ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->mls_status ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Standard Status</div>
-                            <div class="admin-data-value">{{ $property->StandardStatus ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->standard_status ?? 'N/A' }}</div>
                         </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">MLS Area Major</div>
-                            <div class="admin-data-value">{{ $property->MLSAreaMajor ?? 'N/A' }}</div>
-                        </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">MLS Area Minor</div>
-                            <div class="admin-data-value">{{ $property->MLSAreaMinor ?? 'N/A' }}</div>
-                        </div>
-
+                        
                         <div class="admin-section-title">Listing Dates</div>
-
+                        
                         <div class="admin-data-item">
-                            <div class="admin-data-label">List Date</div>
-                            <div class="admin-data-value">{{ $property->ListDate ?? 'N/A' }}</div>
+                            <div class="admin-data-label">Listing Contract Date</div>
+                            <div class="admin-data-value">{{ $property->listing_contract_date ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
-                            <div class="admin-data-label">Status Change Date</div>
-                            <div class="admin-data-value">{{ $property->StatusChangeDate ?? 'N/A' }}</div>
+                            <div class="admin-data-label">On Market Date</div>
+                            <div class="admin-data-value">{{ $property->on_market_date ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
-                            <div class="admin-data-label">Pending Date</div>
-                            <div class="admin-data-value">{{ $property->PendingDate ?? 'N/A' }}</div>
+                            <div class="admin-data-label">Off Market Date</div>
+                            <div class="admin-data-value">{{ $property->off_market_date ?? 'N/A' }}</div>
                         </div>
-
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Pending Timestamp</div>
+                            <div class="admin-data-value">{{ $property->pending_timestamp ?? 'N/A' }}</div>
+                        </div>
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Close Date</div>
-                            <div class="admin-data-value">{{ $property->CloseDate ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->close_date ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
-                            <div class="admin-data-label">Contract Date</div>
-                            <div class="admin-data-value">{{ $property->ContractDate ?? 'N/A' }}</div>
+                            <div class="admin-data-label">Contract Status Change Date</div>
+                            <div class="admin-data-value">{{ $property->contract_status_change_date ?? 'N/A' }}</div>
                         </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Expiration Date</div>
-                            <div class="admin-data-value">{{ $property->ExpirationDate ?? 'N/A' }}</div>
-                        </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Cumulative Days on Market</div>
-                            <div class="admin-data-value">{{ $property->CumulativeDaysOnMarket ?? 'N/A' }}</div>
-                        </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Days On Market</div>
-                            <div class="admin-data-value">{{ $property->DaysOnMarket ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->days_on_market ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-section-title">Property Classification</div>
-
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Property Type</div>
+                            <div class="admin-data-value">{{ $property->property_type ?? 'N/A' }}</div>
+                        </div>
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Property Sub Type</div>
-                            <div class="admin-data-value">{{ $property->PropertySubType ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->property_sub_type ?? 'N/A' }}</div>
                         </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Property Use</div>
-                            <div class="admin-data-value">{{ $property->PropertyUse ?? 'N/A' }}</div>
-                        </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Zoning</div>
-                            <div class="admin-data-value">{{ $property->Zoning ?? 'N/A' }}</div>
-                        </div>
-
+                        
                         <div class="admin-section-title">Property Measurements</div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Lot Size</div>
-                            <div class="admin-data-value">{{ $property->LotSizeAcres ?? 'N/A' }} acres /
-                                {{ $property->LotSizeSquareFeet ?? 'N/A' }} sq ft</div>
+                            <div class="admin-data-value">{{ $property->lot_size_acres ?? 'N/A' }} acres / {{ $property->lot_size_square_feet ?? 'N/A' }} sq ft</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Lot Dimensions</div>
-                            <div class="admin-data-value">{{ $property->LotDimensions ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->lot_size_dimensions ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Living Area</div>
-                            <div class="admin-data-value">{{ $property->LivingArea ?? 'N/A' }}
-                                {{ $property->LivingAreaUnits ?? 'sq ft' }}</div>
+                            <div class="admin-data-value">{{ $property->living_area ?? 'N/A' }} {{ $property->living_area_units ?? 'sq ft' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Year Built</div>
-                            <div class="admin-data-value">{{ $property->YearBuilt ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->year_built ?? 'N/A' }}</div>
                         </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Year Built Source</div>
-                            <div class="admin-data-value">{{ $property->YearBuiltSource ?? 'N/A' }}</div>
-                        </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Year Built Details</div>
-                            <div class="admin-data-value">{{ $property->YearBuiltDetails ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->year_built_details ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-section-title">Pricing Information</div>
-
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">List Price</div>
+                            <div class="admin-data-value">${{ number_format($property->list_price ?? 0, 2) }}</div>
+                        </div>
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Original List Price</div>
-                            <div class="admin-data-value">${{ number_format($property->OriginalListPrice ?? 0, 2) }}
-                            </div>
+                            <div class="admin-data-value">${{ number_format($property->original_list_price ?? 0, 2) }}</div>
                         </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Previous List Price</div>
-                            <div class="admin-data-value">${{ number_format($property->PreviousListPrice ?? 0, 2) }}
-                            </div>
-                        </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Close Price</div>
-                            <div class="admin-data-value">${{ number_format($property->ClosePrice ?? 0, 2) }}</div>
+                            <div class="admin-data-value">${{ number_format($property->close_price ?? 0, 2) }}</div>
                         </div>
-
-                        <div class="admin-data-item">
-                            <div class="admin-data-label">Concessions Amount</div>
-                            <div class="admin-data-value">${{ number_format($property->ConcessionsAmount ?? 0, 2) }}
-                            </div>
-                        </div>
-
+                        
                         <div class="admin-section-title">Additional Information</div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Public Remarks</div>
-                            <div class="admin-data-value">{{ $property->PublicRemarks ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->public_remarks ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
                             <div class="admin-data-label">Private Remarks</div>
-                            <div class="admin-data-value">{{ $property->PrivateRemarks ?? 'N/A' }}</div>
+                            <div class="admin-data-value">{{ $property->private_remarks ?? 'N/A' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
-                            <div class="admin-data-label">Showing Instructions</div>
-                            <div class="admin-data-value">{{ $property->ShowingInstructions ?? 'N/A' }}</div>
+                            <div class="admin-data-label">Syndication Remarks</div>
+                            <div class="admin-data-value">{{ $property->syndication_remarks ?? 'N/A' }}</div>
                         </div>
-
+                        
+                        <div class="admin-section-title">Property Features</div>
+                        
                         <div class="admin-data-item">
-                            <div class="admin-data-label">Occupancy Type</div>
-                            <div class="admin-data-value">{{ $property->OccupancyType ?? 'N/A' }}</div>
+                            <div class="admin-data-label">New Construction</div>
+                            <div class="admin-data-value">{{ $property->new_construction_yn ? 'Yes' : 'No' }}</div>
                         </div>
-
+                        
                         <div class="admin-data-item">
-                            <div class="admin-data-label">Ownership Type</div>
-                            <div class="admin-data-value">{{ $property->OwnershipType ?? 'N/A' }}</div>
+                            <div class="admin-data-label">Furnished</div>
+                            <div class="admin-data-value">{{ $property->furnished ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Waterfront</div>
+                            <div class="admin-data-value">{{ $property->waterfront_yn ? 'Yes' : 'No' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">View</div>
+                            <div class="admin-data-value">{{ $property->view_yn ? 'Yes' : 'No' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Horse Property</div>
+                            <div class="admin-data-value">{{ $property->horse_yn ? 'Yes' : 'No' }}</div>
+                        </div>
+                        
+                        <div class="admin-section-title">API Timestamps</div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Original Entry Timestamp</div>
+                            <div class="admin-data-value">{{ $property->original_entry_timestamp ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Modification Timestamp</div>
+                            <div class="admin-data-value">{{ $property->modification_timestamp ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Price Change Timestamp</div>
+                            <div class="admin-data-value">{{ $property->price_change_timestamp ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Status Change Timestamp</div>
+                            <div class="admin-data-value">{{ $property->status_change_timestamp ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Major Change Timestamp</div>
+                            <div class="admin-data-value">{{ $property->major_change_timestamp ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Photos Change Timestamp</div>
+                            <div class="admin-data-value">{{ $property->photos_change_timestamp ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Bridge Modification Timestamp</div>
+                            <div class="admin-data-value">{{ $property->bridge_modification_timestamp ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-section-title">Metadata</div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Source System Key</div>
+                            <div class="admin-data-value">{{ $property->source_system_key ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Originating System Key</div>
+                            <div class="admin-data-value">{{ $property->originating_system_key ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Originating System Name</div>
+                            <div class="admin-data-value">{{ $property->originating_system_name ?? 'N/A' }}</div>
+                        </div>
+                        
+                        <div class="admin-data-item">
+                            <div class="admin-data-label">Originating System ID</div>
+                            <div class="admin-data-value">{{ $property->originating_system_id ?? 'N/A' }}</div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </div>        
     </div>
 
     <script>
