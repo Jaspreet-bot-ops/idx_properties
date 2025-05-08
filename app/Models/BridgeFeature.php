@@ -15,9 +15,11 @@ class BridgeFeature extends Model
     {
         return $this->belongsTo(BridgeFeatureCategory::class, 'feature_category_id');
     }
-
+    
     public function properties()
     {
-        return $this->belongsToMany(BridgeProperty::class, 'bridge_property_features', 'feature_id', 'property_id');
+        return $this->belongsToMany(BridgeProperty::class, 'bridge_property_features', 'feature_id', 'property_id')
+                    ->withPivot('value')
+                    ->withTimestamps();
     }
 }

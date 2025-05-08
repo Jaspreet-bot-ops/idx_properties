@@ -324,9 +324,9 @@ class PropertyController extends Controller
     //     $search = $request->input('search');
     //     $sortBy = $request->input('sort_by', 'id');
     //     $sortDirection = $request->input('sort_direction', 'desc');
-        
+
     //     $query = BridgeProperty::query();
-        
+
     //     // Apply search filter if provided
     //     if ($search) {
     //         // Check if this is a property_id search
@@ -338,12 +338,12 @@ class PropertyController extends Controller
     //         // Check if this is a street search
     //         else if (preg_match('/street:(.+)/', $search, $matches)) {
     //             $streetInfo = trim($matches[1]);
-                
+
     //             // Try to extract street number and name
     //             if (preg_match('/^(\d+)\s+(.+)$/', $streetInfo, $streetMatches)) {
     //                 $streetNumber = $streetMatches[1];
     //                 $streetName = trim($streetMatches[2]);
-                    
+
     //                 // Search for properties with this street number and name
     //                 $query->where('street_number', $streetNumber)
     //                       ->where('street_name', 'like', $streetName . '%');
@@ -375,7 +375,7 @@ class PropertyController extends Controller
     //         else if (preg_match('/^(\d+)\s+(.+)$/', $search, $streetMatches)) {
     //             $streetNumber = $streetMatches[1];
     //             $streetName = trim($streetMatches[2]);
-                
+
     //             // If it looks like a street address (number followed by text)
     //             $query->where(function($q) use ($streetNumber, $streetName, $search) {
     //                 // Try exact match on street number and name
@@ -399,13 +399,13 @@ class PropertyController extends Controller
     //             });
     //         }
     //     }
-        
+
     //     // Apply sorting
     //     $query->orderBy($sortBy, $sortDirection);
-        
+
     //     // Get paginated results
     //     $properties = $query->paginate(15)->withQueryString();
-        
+
     //     return view('properties', compact('properties'));
     // }     
 
@@ -415,9 +415,9 @@ class PropertyController extends Controller
         $propertyId = $request->input('property_id'); // Get property_id from request
         $sortBy = $request->input('sort_by', 'id');
         $sortDirection = $request->input('sort_direction', 'desc');
-        
+
         $query = BridgeProperty::query();
-        
+
         // If we have a specific property ID, use that for exact matching
         if ($propertyId) {
             $query->where('id', $propertyId);
@@ -429,7 +429,7 @@ class PropertyController extends Controller
                 $city = trim($matches[1]);
                 $state = $matches[2];
                 $query->where('city', $city)
-                      ->where('state_or_province', $state);
+                    ->where('state_or_province', $state);
             }
             // Check if this is a state search
             else if (preg_match('/^([A-Z]{2})$/', $search, $matches)) {
@@ -441,7 +441,7 @@ class PropertyController extends Controller
                 $postalCode = $matches[1];
                 $state = $matches[2];
                 $query->where('postal_code', $postalCode)
-                      ->where('state_or_province', $state);
+                    ->where('state_or_province', $state);
             }
             // Check if this might be a street address with city, state, postal code
             else if (preg_match('/^(\d+)\s+([^,]+),\s*([^,]+),\s*([A-Z]{2})\s*(\d{5})$/', $search, $addressMatches)) {
@@ -450,53 +450,53 @@ class PropertyController extends Controller
                 $city = trim($addressMatches[3]);
                 $state = $addressMatches[4];
                 $postalCode = $addressMatches[5];
-                
-                $query->where(function($q) use ($streetNumber, $streetName, $city, $state, $postalCode) {
+
+                $query->where(function ($q) use ($streetNumber, $streetName, $city, $state, $postalCode) {
                     $q->where('street_number', $streetNumber)
-                      ->where('street_name', 'like', $streetName . '%')
-                      ->where('city', $city)
-                      ->where('state_or_province', $state)
-                      ->where('postal_code', $postalCode);
+                        ->where('street_name', 'like', $streetName . '%')
+                        ->where('city', $city)
+                        ->where('state_or_province', $state)
+                        ->where('postal_code', $postalCode);
                 });
             }
             // Check if this might be a street number and name without city/state
             else if (preg_match('/^(\d+)\s+(.+)$/', $search, $streetMatches)) {
                 $streetNumber = $streetMatches[1];
                 $streetName = trim($streetMatches[2]);
-                
+
                 // If it looks like a street address (number followed by text)
-                $query->where(function($q) use ($streetNumber, $streetName, $search) {
+                $query->where(function ($q) use ($streetNumber, $streetName, $search) {
                     // Try exact match on street number and name
-                    $q->where(function($sq) use ($streetNumber, $streetName) {
+                    $q->where(function ($sq) use ($streetNumber, $streetName) {
                         $sq->where('street_number', $streetNumber)
-                           ->where('street_name', 'like', $streetName . '%');
+                            ->where('street_name', 'like', $streetName . '%');
                     })
-                    // Or try matching the full unparsed address
-                    ->orWhere('unparsed_address', 'like', '%' . $search . '%');
+                        // Or try matching the full unparsed address
+                        ->orWhere('unparsed_address', 'like', '%' . $search . '%');
                 });
             }
             // General search
             else {
-                $query->where(function($q) use ($search) {
+                $query->where(function ($q) use ($search) {
                     $q->where('unparsed_address', 'like', "%{$search}%")
-                      ->orWhere('street_number', 'like', "%{$search}%")
-                      ->orWhere('street_name', 'like', "%{$search}%")
-                      ->orWhere('city', 'like', "%{$search}%")
-                      ->orWhere('state_or_province', 'like', "%{$search}%")
-                      ->orWhere('postal_code', 'like', "%{$search}%");
+                        ->orWhere('street_number', 'like', "%{$search}%")
+                        ->orWhere('street_name', 'like', "%{$search}%")
+                        ->orWhere('city', 'like', "%{$search}%")
+                        ->orWhere('state_or_province', 'like', "%{$search}%")
+                        ->orWhere('postal_code', 'like', "%{$search}%");
                 });
             }
         }
-        
+
         // Apply sorting
         $query->orderBy($sortBy, $sortDirection);
-        
+
         // Get paginated results
         $properties = $query->paginate(15)->withQueryString();
-        
+
         return view('properties', compact('properties'));
     }
-    
+
 
     /**
      * Show the form for creating a new resource.
@@ -531,7 +531,6 @@ class PropertyController extends Controller
         // Load all relationships to ensure complete data is available in the view
         $property->load([
             'details',
-            'amenities',
             'media',
             'schools',
             'financialDetails',
@@ -548,15 +547,21 @@ class PropertyController extends Controller
             'highSchool',
             'features'
         ]);
-        
+
         // Get all features grouped by category for easy display
-        $featuresGrouped = null;
+        $featuresGrouped = collect();
         if ($property->features && $property->features->count() > 0) {
-            $featuresGrouped = $property->features->groupBy('category');
+            // Make sure to eager load the category relationship
+            $property->load('features.category');
+            
+            // Group features by category
+            $featuresGrouped = $property->features->groupBy(function($feature) {
+                return $feature->category ? $feature->category->name : 'Other';
+            });
         }
-        
+
         return view('properties-show', compact('property', 'featuresGrouped'));
-    }    
+    }
 
     /**
      * Show the form for editing the specified resource.
