@@ -58,11 +58,11 @@ class PropertySuggestionController extends Controller
     public function index(Request $request)
     {
         $query = $request->input('q');
-    
+
         if (empty($query) || strlen($query) < 1) {
             return response()->json([]);
         }
-    
+
         // Search for properties that match the query in various fields
         $properties = BridgeProperty::where(function ($q) use ($query) {
             $q->where('unparsed_address', 'like', "%{$query}%")
@@ -88,7 +88,7 @@ class PropertySuggestionController extends Controller
                     'type' => 'property'
                 ];
             });
-    
+
         // Also search for unique cities
         $cities = BridgeProperty::where('city', 'like', "%{$query}%")
             ->whereNotNull('city')
@@ -106,7 +106,7 @@ class PropertySuggestionController extends Controller
                     'type' => 'city'
                 ];
             });
-    
+
         // Search for states
         $states = BridgeProperty::where('state_or_province', 'like', "%{$query}%")
             ->whereNotNull('state_or_province')
@@ -123,7 +123,7 @@ class PropertySuggestionController extends Controller
                     'type' => 'state'
                 ];
             });
-    
+
         // Search for postal codes
         $postalCodes = BridgeProperty::where('postal_code', 'like', "%{$query}%")
             ->whereNotNull('postal_code')
@@ -141,10 +141,10 @@ class PropertySuggestionController extends Controller
                     'type' => 'postal_code'
                 ];
             });
-    
+
         // Combine all results
         $results = $properties->concat($cities)->concat($states)->concat($postalCodes);
-    
+
         return response()->json($results);
     }
 
@@ -235,115 +235,6 @@ class PropertySuggestionController extends Controller
             'price' => $property->ListPrice
         ];
     }
-
-    // public function suggestion(Request $request)
-    // {
-    //     // $query = $request->input('q');
-    //     // $propertyType = $request->input('type');
-
-    //     // $propertyQuery = Property::query();
-
-    //     // // Filter by type
-    //     // if ($propertyType) {
-    //     //     switch (strtolower($propertyType)) {
-    //     //         case 'buy':
-    //     //             $propertyQuery->where('StandardStatus', 'Active');
-    //     //             break;
-    //     //         case 'rent':
-    //     //             $propertyQuery->where('StandardStatus', 'Active')
-    //     //                 ->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
-    //     //             break;
-    //     //     }
-    //     // }
-
-    //     // // Search filters
-    //     // if ($query) {
-    //     //     $propertyQuery->where(function ($q) use ($query) {
-    //     //         $q->where('UnparsedAddress', 'like', "%{$query}%")
-    //     //             ->orWhere('City', 'like', "%{$query}%")
-    //     //             ->orWhere('StateOrProvince', 'like', "%{$query}%")
-    //     //             ->orWhere('PostalCode', 'like', "%{$query}%");
-    //     //     });
-    //     // }
-
-    //     // // Fetch properties
-    //     // $properties = $propertyQuery->select([
-    //     //     'id',
-    //     //     'ListingKey',
-    //     //     'UnparsedAddress',
-    //     //     'City',
-    //     //     'StateOrProvince',
-    //     //     'PostalCode',
-    //     //     'PropertyType',
-    //     //     'PropertySubType',
-    //     //     'StandardStatus',
-    //     //     'ListPrice'
-    //     // ])
-    //     //     ->limit(10) // increased to allow more variety
-    //     //     ->get();
-
-    //     // $buildings = [];
-    //     // $individualProperties = [];
-
-    //     // foreach ($properties as $property) {
-    //     //     // Extract base address (street number + name only)
-    //     //     preg_match('/^\d+\s+[^\d]+/', $property->UnparsedAddress, $matches);
-    //     //     $baseAddress = $matches[0] ?? $property->UnparsedAddress;
-
-    //     //     // If it's "Land", treat it as individual property
-    //     //     if (strtolower($property->PropertySubType) === 'land') {
-    //     //         $individualProperties[] = $this->formatProperty($property);
-    //     //     } else {
-    //     //         $buildings[$baseAddress][] = $this->formatProperty($property);
-    //     //     }
-    //     // }
-
-    //     // // Flatten building groups (optional: you could just return baseAddress and count)
-    //     // $groupedBuildings = array_values($buildings);
-
-    //     // return response()->json([
-    //     //     'buildings' => $groupedBuildings,
-    //     //     'properties' => $individualProperties,
-    //     // ]);
-
-    //     $query = strtolower(trim($request->input('q')));
-    //     $propertyType = $request->input('type'); // 'buy' or 'rent'
-
-    //     $baseQuery = Property::query();
-
-    //     if ($propertyType === 'buy') {
-    //         $baseQuery->where('StandardStatus', 'Active');
-    //     } elseif ($propertyType === 'rent') {
-    //         $baseQuery->where('StandardStatus', 'Active')
-    //             ->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
-    //     }
-
-    //     // Filter for search term in street and city fields
-    //     $filtered = (clone $baseQuery)
-    //         ->where(function ($q) use ($query) {
-    //             $q->whereRaw('LOWER(UnparsedAddress) LIKE ?', ["%{$query}%"])
-    //                 ->orWhereRaw("LOWER(CONCAT(StreetNumber, ' ', StreetName)) LIKE ?", ["%{$query}%"]);
-    //         });
-
-    //     // Get individual unit-level properties
-    //     $properties = (clone $filtered)
-    //         ->select('id', 'UnparsedAddress', 'City', 'StateOrProvince', 'PostalCode')
-    //         ->orderBy('UnparsedAddress')
-    //         ->limit(50)
-    //         ->get();
-
-    //     // Get unique buildings using StreetNumber + StreetName
-    //     $buildings = (clone $filtered)
-    //         ->selectRaw("MIN(id) as id, CONCAT(StreetNumber, ' ', StreetName) as StreetAddress, City, StateOrProvince, PostalCode")
-    //         ->groupBy('StreetAddress', 'City', 'StateOrProvince', 'PostalCode')
-    //         ->limit(50) // limit building results if needed
-    //         ->get();
-
-    //     return response()->json([
-    //         'properties' => $properties,
-    //         'buildings' => $buildings,
-    //     ]);
-    // }
 
     public function search(Request $request)
     {
@@ -457,155 +348,6 @@ class PropertySuggestionController extends Controller
         ]);
     }
 
-    /**
-     * Get address autocomplete suggestions
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    // public function autocomplete(Request $request)
-    // {
-    //     // Validate request
-    //     $request->validate([
-    //         'query' => 'required|string|min:2',
-    //         'limit' => 'nullable|integer|min:1|max:20',
-    //     ]);
-
-    //     $query = $request->input('query');
-    //     $limit = $request->input('limit', 10);
-
-    //     // Define property types that are typically individual properties
-    //     $individualPropertyTypes = [
-    //         'Land', 'SingleFamilyResidence', 'Business', 'BusinessOpportunity',
-    //         'UnimprovedLand', 'Special Purpose'
-    //     ];
-
-    //     // Get building suggestions - only select needed columns
-    //     $buildingSuggestions = DB::table('properties')
-    //         ->select(
-    //             'StreetNumber',
-    //             'StreetName',
-    //             'City',
-    //             'StateOrProvince',
-    //             'PostalCode',
-    //             DB::raw('COUNT(*) as unit_count'),
-    //             DB::raw('MIN(ListPrice) as min_price'),
-    //             DB::raw('MAX(ListPrice) as max_price')
-    //         )
-    //         ->where('StandardStatus', 'Active')
-    //         ->whereNotNull('StreetNumber')
-    //         ->whereNotNull('StreetName')
-    //         ->whereNotIn('PropertySubType', $individualPropertyTypes)
-    //         ->where(function ($q) use ($query) {
-    //             $q->where('UnparsedAddress', 'like', "%{$query}%")
-    //                 ->orWhere('StreetNumber', 'like', "%{$query}%")
-    //                 ->orWhere('StreetName', 'like', "%{$query}%")
-    //                 ->orWhere('City', 'like', "%{$query}%")
-    //                 ->orWhere('StateOrProvince', 'like', "%{$query}%")
-    //                 ->orWhere('PostalCode', 'like', "%{$query}%")
-    //                 ->orWhere('BuildingName', 'like', "%{$query}%");
-    //         })
-    //         ->groupBy('StreetNumber', 'StreetName', 'City', 'StateOrProvince', 'PostalCode')
-    //         ->havingRaw('COUNT(*) > 1')
-    //         ->limit(ceil($limit / 2))
-    //         ->get();
-
-    //     // Format building suggestions
-    //     $formattedBuildingSuggestions = $buildingSuggestions->map(function ($item) {
-    //         return [
-    //             'type' => 'building',
-    //             'address' => trim($item->StreetNumber . ' ' . $item->StreetName),
-    //             'city' => $item->City,
-    //             'state' => $item->StateOrProvince,
-    //             'postal_code' => $item->PostalCode,
-    //             'unit_count' => $item->unit_count,
-    //             'min_price' => $item->min_price,
-    //             'max_price' => $item->max_price,
-    //             'display_text' => trim($item->StreetNumber . ' ' . $item->StreetName) .
-    //                 ($item->City ? ', ' . $item->City : '') .
-    //                 ($item->StateOrProvince ? ', ' . $item->StateOrProvince : '') .
-    //                 ' (' . $item->unit_count . ' units)'
-    //         ];
-    //     });
-
-    //     // Get individual property suggestions
-    //     $propertySuggestions = Property::select(
-    //         'id',
-    //         'ListingKey',
-    //         'StreetNumber',
-    //         'StreetName',
-    //         'City',
-    //         'StateOrProvince',
-    //         'PostalCode',
-    //         'PropertySubType',
-    //         'ListPrice'
-    //     )
-    //         ->where('StandardStatus', 'Active')
-    //         ->where(function ($q) use ($individualPropertyTypes) {
-    //             $q->whereIn('PropertySubType', $individualPropertyTypes)
-    //                 ->orWhereRaw("(StreetNumber, StreetName) IN (
-    //                   SELECT StreetNumber, StreetName 
-    //                   FROM (
-    //                       SELECT StreetNumber, StreetName, COUNT(*) as count
-    //                       FROM properties 
-    //                       WHERE StreetNumber IS NOT NULL AND StreetName IS NOT NULL
-    //                       GROUP BY StreetNumber, StreetName
-    //                       HAVING count = 1
-    //                   ) as single_address_properties
-    //               )");
-    //         })
-    //         ->where(function ($q) use ($query) {
-    //             $q->where('UnparsedAddress', 'like', "%{$query}%")
-    //                 ->orWhere('StreetNumber', 'like', "%{$query}%")
-    //                 ->orWhere('StreetName', 'like', "%{$query}%")
-    //                 ->orWhere('City', 'like', "%{$query}%")
-    //                 ->orWhere('StateOrProvince', 'like', "%{$query}%")
-    //                 ->orWhere('PostalCode', 'like', "%{$query}%");
-    //         })
-    //         ->limit(floor($limit / 2))
-    //         ->get();
-
-    //     // Format property suggestions
-    //     $formattedPropertySuggestions = $propertySuggestions->map(function ($item) {
-    //         return [
-    //             'type' => 'property',
-    //             'id' => $item->id,
-    //             'listing_key' => $item->ListingKey,
-    //             'address' => trim($item->StreetNumber . ' ' . $item->StreetName),
-    //             'city' => $item->City,
-    //             'state' => $item->StateOrProvince,
-    //             'postal_code' => $item->PostalCode,
-    //             'property_type' => $item->PropertySubType,
-    //             'price' => $item->ListPrice,
-    //             'display_text' => trim($item->StreetNumber . ' ' . $item->StreetName) .
-    //                 ($item->City ? ', ' . $item->City : '') .
-    //                 ($item->StateOrProvince ? ', ' . $item->StateOrProvince : '') .
-    //                 ' (' . $item->PropertySubType . ')'
-    //         ];
-    //     });
-
-    //     // Combine and return results
-    //     $suggestions = collect(array_merge($formattedBuildingSuggestions->toArray(), $formattedPropertySuggestions->toArray()))
-    //         ->sortBy(function ($item) use ($query) {
-    //             // Sort by relevance - items that start with the query should come first
-    //             $address = $item['address'];
-    //             if (stripos($address, $query) === 0) {
-    //                 return 0; // Highest priority if address starts with query
-    //             } else if (stripos($address, $query) !== false) {
-    //                 return 1; // Medium priority if address contains query
-    //             } else {
-    //                 return 2; // Lowest priority for other matches
-    //             }
-    //         })
-    //         ->values()
-    //         ->take($limit);
-
-    //     return response()->json([
-    //         'suggestions' => $suggestions
-    //     ]);
-    // }
-
-
     private function getFullStateName($abbr)
     {
         $states = [
@@ -671,13 +413,299 @@ class PropertySuggestionController extends Controller
     }
 
 
+    // public function autocomplete(Request $request)
+    // {
+    //     // Get search parameters - support both 'q' and 'query' parameters
+    //     $query = $request->input('q') ?? $request->input('query');
+    //     $type = $request->input('type'); // 'buy' or 'rent'
+    //     $limit = $request->input('limit', 15); // Default 15 suggestions total
+
+    //     // Validate query parameter
+    //     if (empty($query) || strlen($query) < 0) {
+    //         return response()->json([
+    //             'suggestions' => [
+    //                 'addresses' => [],
+    //                 'buildings' => [],
+    //                 'places' => []
+    //             ]
+    //         ]);
+    //     }
+
+    //     // Allocate limits for each category
+    //     $addressLimit = ceil($limit * 0.4); // 40% for addresses
+    //     $buildingLimit = ceil($limit * 0.3); // 30% for buildings
+    //     $placeLimit = ceil($limit * 0.3); // 30% for places
+
+    //     // Define property types that are typically individual properties
+    //     $individualPropertyTypes = [
+    //         'Land', 'SingleFamilyResidence', 'Business', 'BusinessOpportunity',
+    //         'UnimprovedLand', 'Special Purpose'
+    //     ];
+
+    //     // Base query with common conditions
+    //     $baseQuery = Property::query()->where('StandardStatus', 'Active');
+
+    //     // Apply type filter if provided
+    //     if ($type) {
+    //         switch (strtolower($type)) {
+    //             case 'buy':
+    //                 // Properties for sale
+    //                 $baseQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+    //                 break;
+
+    //             case 'rent':
+    //                 // Properties for rent
+    //                 $baseQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+    //                 break;
+    //         }
+    //     }
+
+    //     // 1. ADDRESS SUGGESTIONS - Individual property addresses
+    //     $addressQuery = clone $baseQuery;
+    //     $addressSuggestions = $addressQuery->select(
+    //         'id',
+    //         'ListingKey',
+    //         'StreetNumber',
+    //         'StreetName',
+    //         'UnitNumber',
+    //         'City',
+    //         'StateOrProvince',
+    //         'PostalCode',
+    //         'PropertySubType',
+    //         'ListPrice'
+    //     )
+    //         ->where(function ($q) use ($query) {
+    //             // Prioritize exact matches first
+    //             $q->where('UnparsedAddress', 'like', "{$query}%")
+    //                 ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "{$query}%")
+    //                 // Then try partial matches
+    //                 ->orWhere('UnparsedAddress', 'like', "%{$query}%")
+    //                 ->orWhere('StreetNumber', 'like', "{$query}%")
+    //                 ->orWhere('StreetName', 'like', "%{$query}%")
+    //                 ->orWhere('City', 'like', "%{$query}%")
+    //                 ->orWhere('StateOrProvince', 'like', "%{$query}%");
+    //         })
+    //         ->orderByRaw("CASE 
+    //         WHEN UnparsedAddress LIKE '{$query}%' THEN 1
+    //         WHEN CONCAT(StreetNumber, ' ', StreetName) LIKE '{$query}%' THEN 2
+    //         ELSE 3
+    //     END")
+    //         ->limit($addressLimit)
+    //         ->get()
+    //         ->map(function ($item) {
+    //             $address = trim($item->StreetNumber . ' ' . $item->StreetName);
+    //             if (!empty($item->UnitNumber)) {
+    //                 $address .= ' #' . $item->UnitNumber;
+    //             }
+
+    //             return [
+    //                 'type' => 'address',
+    //                 'id' => $item->id,
+    //                 'listing_key' => $item->ListingKey,
+    //                 'address' => $address,
+    //                 'city' => $item->City,
+    //                 'state' => $item->StateOrProvince,
+    //                 'postal_code' => $item->PostalCode,
+    //                 'property_type' => $item->PropertySubType,
+    //                 'price' => $item->ListPrice,
+    //                 'display_text' => $address .
+    //                     ($item->City ? ', ' . $item->City : '') .
+    //                     ($item->StateOrProvince ? ', ' . $item->StateOrProvince : ''),
+    //                 'action_url' => "/api/properties/{$item->id}"
+    //             ];
+    //         });
+
+    //     // 2. BUILDING SUGGESTIONS - Multi-unit buildings
+    //     $buildingQuery = DB::table('properties')
+    //         ->select(
+    //             'StreetNumber',
+    //             'StreetName',
+    //             'StreetDirPrefix',
+    //             'City',
+    //             'StateOrProvince',
+    //             'PostalCode',
+    //             'BuildingName',
+    //             DB::raw('COUNT(*) as unit_count'),
+    //             DB::raw('MIN(ListPrice) as min_price'),
+    //             DB::raw('MAX(ListPrice) as max_price')
+    //         )
+    //         ->where('StandardStatus', 'Active')
+    //         ->whereNotNull('StreetNumber')
+    //         ->whereNotNull('StreetName')
+    //         ->whereNotIn('PropertySubType', $individualPropertyTypes);
+
+    //     // Apply type filter to buildings
+    //     if ($type) {
+    //         switch (strtolower($type)) {
+    //             case 'buy':
+    //                 $buildingQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+    //                 break;
+    //             case 'rent':
+    //                 $buildingQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+    //                 break;
+    //         }
+    //     }
+
+    //     $buildingSuggestions = $buildingQuery->where(function ($q) use ($query) {
+    //         // Prioritize exact matches first
+    //         $q->where(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "{$query}%")
+    //             ->orWhere('BuildingName', 'like', "{$query}%")
+    //             // Then try partial matches
+    //             ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$query}%")
+    //             ->orWhere('BuildingName', 'like', "%{$query}%")
+    //             ->orWhere('StreetNumber', 'like', "{$query}%")
+    //             ->orWhere('StreetName', 'like', "%{$query}%")
+    //             ->orWhere('City', 'like', "%{$query}%");
+    //     })
+    //         ->groupBy('StreetNumber', 'StreetName', 'StreetDirPrefix', 'City', 'StateOrProvince', 'PostalCode', 'BuildingName')
+    //         ->havingRaw('COUNT(*) > 1')
+    //         ->orderByRaw("CASE 
+    //         WHEN CONCAT(StreetNumber, ' ', StreetName) LIKE '{$query}%' THEN 1
+    //         WHEN BuildingName LIKE '{$query}%' THEN 2
+    //         ELSE 3
+    //     END")
+    //         ->limit($buildingLimit)
+    //         ->get()
+    //         ->map(function ($item) {
+    //             $address = trim($item->StreetNumber . ' ' .
+    //                 ($item->StreetDirPrefix ? $item->StreetDirPrefix . ' ' : '') .
+    //                 $item->StreetName);
+    //             $buildingName = !empty($item->BuildingName) ? $item->BuildingName : $address;
+
+    //             return [
+    //                 'type' => 'building',
+    //                 'building_name' => $buildingName,
+    //                 'street_number' => $item->StreetNumber,
+    //                 'street_dir_prefix' => $item->StreetDirPrefix,
+    //                 'street_name' => $item->StreetName,
+    //                 'address' => trim($item->StreetNumber . ' ' . $item->StreetName),
+    //                 'city' => $item->City,
+    //                 'state' => $item->StateOrProvince,
+    //                 'postal_code' => $item->PostalCode,
+    //                 'unit_count' => $item->unit_count,
+    //                 'min_price' => $item->min_price,
+    //                 'max_price' => $item->max_price,
+    //                 'display_text' => $buildingName .
+    //                     ($item->City ? ', ' . $item->City : '') .
+    //                     ($item->StateOrProvince ? ', ' . $item->StateOrProvince : '') .
+    //                     ' (' . $item->unit_count . ' units)',
+    //                 'action_url' => "/api/buildings?street_number={$item->StreetNumber}&street_name=" . urlencode($item->StreetName)
+    //             ];
+    //         });
+
+    //     // 3. PLACE SUGGESTIONS - Cities and States
+    //     // First get unique cities
+    //     $citySuggestions = DB::table('properties')
+    //         ->select('City', 'StateOrProvince')
+    //         ->where('City', 'like', "%{$query}%")
+    //         ->whereNotNull('City')
+    //         ->where('City', '!=', '')
+    //         ->where('City', '!=', ',') // Exclude invalid city names
+    //         ->groupBy('City', 'StateOrProvince')
+    //         ->orderByRaw("CASE WHEN City LIKE '{$query}%' THEN 1 ELSE 2 END")
+    //         ->limit($placeLimit)
+    //         ->get()
+    //         ->map(function ($item) {
+    //             return [
+    //                 'type' => 'place',
+    //                 'place_type' => 'city',
+    //                 'name' => $item->City,
+    //                 'state' => $item->StateOrProvince,
+    //                 'display_text' => $item->City . ($item->StateOrProvince ? ', ' . $item->StateOrProvince : ''),
+    //                 'action_url' => "/api/properties/search?city=" . urlencode($item->City)
+    //             ];
+    //         });
+
+    //     $stateSuggestions = DB::table('properties')
+    //         ->select('StateOrProvince')
+    //         ->where('StateOrProvince', 'like', "%{$query}%")
+    //         ->whereNotNull('StateOrProvince')
+    //         ->where('StateOrProvince', '!=', '')
+    //         ->groupBy('StateOrProvince')
+    //         ->orderByRaw("CASE WHEN StateOrProvince LIKE '{$query}%' THEN 1 ELSE 2 END")
+    //         ->limit($placeLimit)
+    //         ->get()
+    //         ->map(function ($item) {
+    //             $fullStateName = $this->getFullStateName($item->StateOrProvince);
+    //             return [
+    //                 'type' => 'place',
+    //                 'place_type' => 'state',
+    //                 'name' => $item->StateOrProvince,
+    //                 'full_name' => $fullStateName,
+    //                 'display_text' => $fullStateName,
+    //                 'state' => $item->StateOrProvince,
+    //                 'action_url' => "/api/properties/search?state=" . urlencode($item->StateOrProvince)
+    //             ];
+    //         });
+
+    //     $postalCodeSuggestions = DB::table('properties')
+    //         ->select('PostalCode', 'StateOrProvince')
+    //         ->where('PostalCode', 'like', "%{$query}%")
+    //         ->whereNotNull('PostalCode')
+    //         ->where('PostalCode', '!=', '')
+    //         ->groupBy('PostalCode', 'StateOrProvince')
+    //         ->orderByRaw("CASE WHEN PostalCode LIKE '{$query}%' THEN 1 ELSE 2 END")
+    //         ->limit($placeLimit)
+    //         ->get()
+    //         ->map(function ($item) {
+    //             return [
+    //                 'type' => 'place',
+    //                 'place_type' => 'postal_code',  // Changed from 'state' to 'postal_code'
+    //                 'name' => $item->PostalCode,
+    //                 'display_text' => $item->StateOrProvince ? $item->StateOrProvince : null,
+    //                 'action_url' => "/api/properties/search?postalCode=" . $item->PostalCode
+    //             ];
+    //         });
+
+    //     // Combine city and state suggestions
+    //     $placeSuggestions = $citySuggestions->concat($stateSuggestions)->concat($postalCodeSuggestions)->take($placeLimit);
+
+    //     // Combine all suggestions
+    //     $allSuggestions = collect([])
+    //         ->concat($addressSuggestions)
+    //         ->concat($buildingSuggestions)
+    //         ->concat($placeSuggestions)
+    //         ->sortBy(function ($item) use ($query) {
+    //             // Sort by relevance - items that start with the query should come first
+    //             $searchableText = $item['type'] === 'address' || $item['type'] === 'building'
+    //                 ? $item['address']
+    //                 : ($item['type'] === 'place' ? $item['name'] : '');
+
+    //             if (stripos($searchableText, $query) === 0) {
+    //                 return 0; // Highest priority if text starts with query
+    //             } else if (stripos($searchableText, $query) !== false) {
+    //                 return 1; // Medium priority if text contains query
+    //             } else {
+    //                 return 2; // Lowest priority for other matches
+    //             }
+    //         })
+    //         ->values()
+    //         ->take($limit);
+
+    //     // Group suggestions by type
+    //     $groupedSuggestions = [
+    //         'addresses' => $allSuggestions->where('type', 'address')->values(),
+    //         'buildings' => $allSuggestions->where('type', 'building')->values(),
+    //         'places' => $allSuggestions->where('type', 'place')->values()
+    //     ];
+
+    //     return response()->json([
+    //         'suggestions' => $groupedSuggestions
+    //     ]);
+    // }
+
+
     public function autocomplete(Request $request)
     {
+
+        // dd("dfsfsdg");
         // Get search parameters - support both 'q' and 'query' parameters
         $query = $request->input('q') ?? $request->input('query');
         $type = $request->input('type'); // 'buy' or 'rent'
         $limit = $request->input('limit', 15); // Default 15 suggestions total
 
+
+        // dd($request->all());
         // Validate query parameter
         if (empty($query) || strlen($query) < 0) {
             return response()->json([
@@ -700,20 +728,20 @@ class PropertySuggestionController extends Controller
             'UnimprovedLand', 'Special Purpose'
         ];
 
-        // Base query with common conditions
-        $baseQuery = Property::query()->where('StandardStatus', 'Active');
+        // Base query without status filter
+        $baseQuery = BridgeProperty::query();
 
         // Apply type filter if provided
         if ($type) {
             switch (strtolower($type)) {
                 case 'buy':
                     // Properties for sale
-                    $baseQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    $baseQuery->whereNotIn('property_type', ['ResidentialLease', 'CommercialLease']);
                     break;
 
                 case 'rent':
                     // Properties for rent
-                    $baseQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    $baseQuery->whereIn('property_type', ['ResidentialLease', 'CommercialLease']);
                     break;
             }
         }
@@ -722,196 +750,270 @@ class PropertySuggestionController extends Controller
         $addressQuery = clone $baseQuery;
         $addressSuggestions = $addressQuery->select(
             'id',
-            'ListingKey',
-            'StreetNumber',
-            'StreetName',
-            'UnitNumber',
-            'City',
-            'StateOrProvince',
-            'PostalCode',
-            'PropertySubType',
-            'ListPrice'
+            'listing_key',
+            'street_number',
+            'street_name',
+            'unit_number',
+            'city',
+            'state_or_province',
+            'postal_code',
+            'property_sub_type',
+            'list_price',
+            'standard_status'
         )
             ->where(function ($q) use ($query) {
                 // Prioritize exact matches first
-                $q->where('UnparsedAddress', 'like', "{$query}%")
-                    ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "{$query}%")
+                $q->where('unparsed_address', 'like', "{$query}%")
+                    ->orWhere(DB::raw("CONCAT(street_number, ' ', street_name)"), 'like', "{$query}%")
                     // Then try partial matches
-                    ->orWhere('UnparsedAddress', 'like', "%{$query}%")
-                    ->orWhere('StreetNumber', 'like', "{$query}%")
-                    ->orWhere('StreetName', 'like', "%{$query}%")
-                    ->orWhere('City', 'like', "%{$query}%")
-                    ->orWhere('StateOrProvince', 'like', "%{$query}%");
+                    ->orWhere('unparsed_address', 'like', "%{$query}%")
+                    ->orWhere('street_number', 'like', "{$query}%")
+                    ->orWhere('street_name', 'like', "%{$query}%")
+                    ->orWhere('city', 'like', "%{$query}%")
+                    ->orWhere('state_or_province', 'like', "%{$query}%");
             })
             ->orderByRaw("CASE 
-            WHEN UnparsedAddress LIKE '{$query}%' THEN 1
-            WHEN CONCAT(StreetNumber, ' ', StreetName) LIKE '{$query}%' THEN 2
-            ELSE 3
+        WHEN unparsed_address LIKE '{$query}%' THEN 1
+        WHEN CONCAT(street_number, ' ', street_name) LIKE '{$query}%' THEN 2
+        ELSE 3
         END")
             ->limit($addressLimit)
             ->get()
             ->map(function ($item) {
-                $address = trim($item->StreetNumber . ' ' . $item->StreetName);
-                if (!empty($item->UnitNumber)) {
-                    $address .= ' #' . $item->UnitNumber;
+                $address = trim($item->street_number . ' ' . $item->street_name);
+                if (!empty($item->unit_number)) {
+                    $address .= ' #' . $item->unit_number;
                 }
 
                 return [
                     'type' => 'address',
                     'id' => $item->id,
-                    'listing_key' => $item->ListingKey,
+                    'listing_key' => $item->listing_key,
                     'address' => $address,
-                    'city' => $item->City,
-                    'state' => $item->StateOrProvince,
-                    'postal_code' => $item->PostalCode,
-                    'property_type' => $item->PropertySubType,
-                    'price' => $item->ListPrice,
+                    'city' => $item->city,
+                    'state' => $item->state_or_province,
+                    'postal_code' => $item->postal_code,
+                    'property_type' => $item->property_sub_type,
+                    'price' => $item->list_price,
+                    'status' => $item->standard_status,
                     'display_text' => $address .
-                        ($item->City ? ', ' . $item->City : '') .
-                        ($item->StateOrProvince ? ', ' . $item->StateOrProvince : ''),
+                        ($item->city ? ', ' . $item->city : '') .
+                        ($item->state_or_province ? ', ' . $item->state_or_province : ''),
                     'action_url' => "/api/properties/{$item->id}"
                 ];
             });
 
-        // 2. BUILDING SUGGESTIONS - Multi-unit buildings
-        $buildingQuery = DB::table('properties')
+        $buildingNames = DB::table('bridge_property_details')
+            ->select('property_id', 'building_name')
+            ->whereNotNull('building_name')
+            ->where('building_name', '!=', '')
+            ->where('building_name', 'like', "%{$query}%")
+            ->get()
+            ->keyBy('property_id');
+
+        // Get property IDs with building names
+        $propertyIdsWithBuildingNames = $buildingNames->keys()->toArray();
+
+        // Get properties with those IDs to get full property details
+        $propertiesWithBuildingNames = [];
+        if (!empty($propertyIdsWithBuildingNames)) {
+            $propertiesWithBuildingNames = BridgeProperty::whereIn('id', $propertyIdsWithBuildingNames)
+                ->select(
+                    'id',
+                    'street_number',
+                    'street_name',
+                    'street_dir_prefix',
+                    'city',
+                    'state_or_province',
+                    'postal_code',
+                    'property_sub_type'
+                )
+                ->get()
+                ->keyBy('id');
+        }
+
+
+        $buildingQuery = DB::table('bridge_properties as bp')
             ->select(
-                'StreetNumber',
-                'StreetName',
-                'StreetDirPrefix',
-                'City',
-                'StateOrProvince',
-                'PostalCode',
-                'BuildingName',
+                'bp.street_number',
+                'bp.street_name',
+                'bp.street_dir_prefix',
+                'bp.city',
+                'bp.state_or_province',
+                'bp.postal_code',
+                'bp.property_sub_type',
                 DB::raw('COUNT(*) as unit_count'),
-                DB::raw('MIN(ListPrice) as min_price'),
-                DB::raw('MAX(ListPrice) as max_price')
+                DB::raw('MIN(bp.list_price) as min_price'),
+                DB::raw('MAX(bp.list_price) as max_price')
             )
-            ->where('StandardStatus', 'Active')
-            ->whereNotNull('StreetNumber')
-            ->whereNotNull('StreetName')
-            ->whereNotIn('PropertySubType', $individualPropertyTypes);
+            ->leftJoin('bridge_property_details as bpd', 'bp.id', '=', 'bpd.property_id')
+            ->whereNotNull('bp.street_number')
+            ->whereNotNull('bp.street_name')
+            ->whereNotIn('bp.property_sub_type', $individualPropertyTypes);
 
         // Apply type filter to buildings
         if ($type) {
             switch (strtolower($type)) {
                 case 'buy':
-                    $buildingQuery->whereNotIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    $buildingQuery->whereNotIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
                     break;
                 case 'rent':
-                    $buildingQuery->whereIn('PropertyType', ['ResidentialLease', 'CommercialLease']);
+                    $buildingQuery->whereIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
                     break;
             }
         }
 
-        $buildingSuggestions = $buildingQuery->where(function ($q) use ($query) {
+        $buildingQuery = DB::table('bridge_properties as bp')
+            ->select(
+                'bp.street_number',
+                'bp.street_name',
+                'bp.street_dir_prefix',
+                'bp.city',
+                'bp.state_or_province',
+                'bp.postal_code',
+                'bp.property_sub_type',
+                DB::raw('MAX(bpd.building_name) as building_name'), // Use MAX to aggregate building_name
+                DB::raw('COUNT(*) as unit_count'),
+                DB::raw('MIN(bp.list_price) as min_price'),
+                DB::raw('MAX(bp.list_price) as max_price')
+            )
+            ->leftJoin('bridge_property_details as bpd', 'bp.id', '=', 'bpd.property_id')
+            ->whereNotNull('bp.street_number')
+            ->whereNotNull('bp.street_name')
+            ->whereNotIn('bp.property_sub_type', $individualPropertyTypes);
+
+        // Apply type filter to buildings
+        if ($type) {
+            switch (strtolower($type)) {
+                case 'buy':
+                    $buildingQuery->whereNotIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
+                    break;
+                case 'rent':
+                    $buildingQuery->whereIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
+                    break;
+            }
+        }
+
+        $buildingQuery->where(function ($q) use ($query) {
             // Prioritize exact matches first
-            $q->where(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "{$query}%")
-                ->orWhere('BuildingName', 'like', "{$query}%")
+            $q->where(DB::raw("CONCAT(bp.street_number, ' ', bp.street_name)"), 'like', "{$query}%")
+                ->orWhere('bpd.building_name', 'like', "{$query}%")
                 // Then try partial matches
-                ->orWhere(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$query}%")
-                ->orWhere('BuildingName', 'like', "%{$query}%")
-                ->orWhere('StreetNumber', 'like', "{$query}%")
-                ->orWhere('StreetName', 'like', "%{$query}%")
-                ->orWhere('City', 'like', "%{$query}%");
-        })
-            ->groupBy('StreetNumber', 'StreetName', 'StreetDirPrefix', 'City', 'StateOrProvince', 'PostalCode', 'BuildingName')
+                ->orWhere(DB::raw("CONCAT(bp.street_number, ' ', bp.street_name)"), 'like', "%{$query}%")
+                ->orWhere('bpd.building_name', 'like', "%{$query}%")
+                ->orWhere('bp.street_number', 'like', "{$query}%")
+                ->orWhere('bp.street_name', 'like', "%{$query}%")
+                ->orWhere('bp.city', 'like', "%{$query}%");
+        });
+
+        $buildingSuggestions = $buildingQuery
+            ->groupBy(
+                'bp.street_number',
+                'bp.street_name',
+                'bp.street_dir_prefix',
+                'bp.city',
+                'bp.state_or_province',
+                'bp.postal_code',
+                'bp.property_sub_type'
+            )
             ->havingRaw('COUNT(*) > 1')
             ->orderByRaw("CASE 
-            WHEN CONCAT(StreetNumber, ' ', StreetName) LIKE '{$query}%' THEN 1
-            WHEN BuildingName LIKE '{$query}%' THEN 2
-            ELSE 3
-        END")
+                WHEN CONCAT(bp.street_number, ' ', bp.street_name) LIKE '{$query}%' THEN 1
+                WHEN MAX(bpd.building_name) LIKE '{$query}%' THEN 2
+                ELSE 3
+            END")
             ->limit($buildingLimit)
             ->get()
             ->map(function ($item) {
-                $address = trim($item->StreetNumber . ' ' .
-                    ($item->StreetDirPrefix ? $item->StreetDirPrefix . ' ' : '') .
-                    $item->StreetName);
-                $buildingName = !empty($item->BuildingName) ? $item->BuildingName : $address;
+                // Access properties as object properties, not array indices
+                $address = trim($item->street_number . ' ' .
+                    ($item->street_dir_prefix ? $item->street_dir_prefix . ' ' : '') .
+                    $item->street_name);
+
+                // Use the building_name from the query result if available
+                $buildingName = !empty($item->building_name) ? $item->building_name : $address;
 
                 return [
                     'type' => 'building',
                     'building_name' => $buildingName,
-                    'street_number' => $item->StreetNumber,
-                    'street_dir_prefix' => $item->StreetDirPrefix,
-                    'street_name' => $item->StreetName,
-                    'address' => trim($item->StreetNumber . ' ' . $item->StreetName),
-                    'city' => $item->City,
-                    'state' => $item->StateOrProvince,
-                    'postal_code' => $item->PostalCode,
+                    'street_number' => $item->street_number,
+                    'street_dir_prefix' => $item->street_dir_prefix,
+                    'street_name' => $item->street_name,
+                    'address' => $address,
+                    'city' => $item->city,
+                    'state' => $item->state_or_province,
+                    'postal_code' => $item->postal_code,
+                    'property_sub_type' => $item->property_sub_type,
                     'unit_count' => $item->unit_count,
                     'min_price' => $item->min_price,
                     'max_price' => $item->max_price,
                     'display_text' => $buildingName .
-                        ($item->City ? ', ' . $item->City : '') .
-                        ($item->StateOrProvince ? ', ' . $item->StateOrProvince : '') .
+                        ($item->city ? ', ' . $item->city : '') .
+                        ($item->state_or_province ? ', ' . $item->state_or_province : '') .
                         ' (' . $item->unit_count . ' units)',
-                    'action_url' => "/api/buildings?street_number={$item->StreetNumber}&street_name=" . urlencode($item->StreetName)
+                    'action_url' => "/api/buildings?street_number={$item->street_number}&street_name=" . urlencode($item->street_name)
                 ];
             });
 
-        // 3. PLACE SUGGESTIONS - Cities and States
-        // First get unique cities
-        $citySuggestions = DB::table('properties')
-            ->select('City', 'StateOrProvince')
-            ->where('City', 'like', "%{$query}%")
-            ->whereNotNull('City')
-            ->where('City', '!=', '')
-            ->where('City', '!=', ',') // Exclude invalid city names
-            ->groupBy('City', 'StateOrProvince')
-            ->orderByRaw("CASE WHEN City LIKE '{$query}%' THEN 1 ELSE 2 END")
+
+        $citySuggestions = DB::table('bridge_properties')
+            ->select('city', 'state_or_province')
+            ->where('city', 'like', "%{$query}%")
+            ->whereNotNull('city')
+            ->where('city', '!=', '')
+            ->where('city', '!=', ',') // Exclude invalid city names
+            ->groupBy('city', 'state_or_province')
+            ->orderByRaw("CASE WHEN city LIKE '{$query}%' THEN 1 ELSE 2 END")
             ->limit($placeLimit)
             ->get()
             ->map(function ($item) {
                 return [
                     'type' => 'place',
                     'place_type' => 'city',
-                    'name' => $item->City,
-                    'state' => $item->StateOrProvince,
-                    'display_text' => $item->City . ($item->StateOrProvince ? ', ' . $item->StateOrProvince : ''),
-                    'action_url' => "/api/properties/search?city=" . urlencode($item->City)
+                    'name' => $item->city,
+                    'state' => $item->state_or_province,
+                    'display_text' => $item->city . ($item->state_or_province ? ', ' . $item->state_or_province : ''),
+                    'action_url' => "/api/properties/search?city=" . urlencode($item->city)
                 ];
             });
 
-        $stateSuggestions = DB::table('properties')
-            ->select('StateOrProvince')
-            ->where('StateOrProvince', 'like', "%{$query}%")
-            ->whereNotNull('StateOrProvince')
-            ->where('StateOrProvince', '!=', '')
-            ->groupBy('StateOrProvince')
-            ->orderByRaw("CASE WHEN StateOrProvince LIKE '{$query}%' THEN 1 ELSE 2 END")
+        $stateSuggestions = DB::table('bridge_properties')
+            ->select('state_or_province')
+            ->where('state_or_province', 'like', "%{$query}%")
+            ->whereNotNull('state_or_province')
+            ->where('state_or_province', '!=', '')
+            ->groupBy('state_or_province')
+            ->orderByRaw("CASE WHEN state_or_province LIKE '{$query}%' THEN 1 ELSE 2 END")
             ->limit($placeLimit)
             ->get()
             ->map(function ($item) {
-                $fullStateName = $this->getFullStateName($item->StateOrProvince);
+                $fullStateName = $this->getFullStateName($item->state_or_province);
                 return [
                     'type' => 'place',
                     'place_type' => 'state',
-                    'name' => $item->StateOrProvince,
-                    'full_name' => $fullStateName,
+                    'name' => $fullStateName,
+                    'code' => $item->state_or_province,
                     'display_text' => $fullStateName,
-                    'state' => $item->StateOrProvince,
-                    'action_url' => "/api/properties/search?state=" . urlencode($item->StateOrProvince)
+                    'action_url' => "/api/properties/search?state=" . urlencode($item->state_or_province)
                 ];
             });
 
-        $postalCodeSuggestions = DB::table('properties')
-            ->select('PostalCode', 'StateOrProvince')
-            ->where('PostalCode', 'like', "%{$query}%")
-            ->whereNotNull('PostalCode')
-            ->where('PostalCode', '!=', '')
-            ->groupBy('PostalCode', 'StateOrProvince')
-            ->orderByRaw("CASE WHEN PostalCode LIKE '{$query}%' THEN 1 ELSE 2 END")
+        $postalCodeSuggestions = DB::table('bridge_properties')
+            ->select('postal_code', 'state_or_province')
+            ->where('postal_code', 'like', "%{$query}%")
+            ->whereNotNull('postal_code')
+            ->where('postal_code', '!=', '')
+            ->groupBy('postal_code', 'state_or_province')
+            ->orderByRaw("CASE WHEN postal_code LIKE '{$query}%' THEN 1 ELSE 2 END")
             ->limit($placeLimit)
             ->get()
             ->map(function ($item) {
                 return [
                     'type' => 'place',
-                    'place_type' => 'postal_code',  // Changed from 'state' to 'postal_code'
-                    'name' => $item->PostalCode,
-                    'display_text' => $item->StateOrProvince ? $item->StateOrProvince : null,
-                    'action_url' => "/api/properties/search?postalCode=" . $item->PostalCode
+                    'place_type' => 'postal_code',
+                    'name' => $item->postal_code,
+                    'display_text' => $item->postal_code . ($item->state_or_province ? ', ' . $item->state_or_province : ''),
+                    'action_url' => "/api/properties/search?postalCode=" . $item->postal_code
                 ];
             });
 
@@ -925,9 +1027,15 @@ class PropertySuggestionController extends Controller
             ->concat($placeSuggestions)
             ->sortBy(function ($item) use ($query) {
                 // Sort by relevance - items that start with the query should come first
-                $searchableText = $item['type'] === 'address' || $item['type'] === 'building'
-                    ? $item['address']
-                    : ($item['type'] === 'place' ? $item['name'] : '');
+                $searchableText = '';
+
+                if ($item['type'] === 'address') {
+                    $searchableText = $item['address'];
+                } else if ($item['type'] === 'building') {
+                    $searchableText = $item['building_name'] ?? $item['address'];
+                } else if ($item['type'] === 'place') {
+                    $searchableText = $item['name'];
+                }
 
                 if (stripos($searchableText, $query) === 0) {
                     return 0; // Highest priority if text starts with query

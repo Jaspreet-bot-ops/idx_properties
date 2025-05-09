@@ -22,17 +22,6 @@ use Carbon\Carbon;
 
 class ImportPropertiesFromBridge extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    // protected $signature = 'bridge:import-properties 
-    //                         {--limit=100 : Number of properties to import} 
-    //                         {--offset=0 : Offset for pagination}
-    //                         {--status=Active : Property status to import (Active, Pending, Closed, etc.)}
-    //                         {--update : Update existing properties instead of skipping}';
-
 
     protected $signature = 'bridge:import-properties 
                         {--limit=200 : Number of properties per batch} 

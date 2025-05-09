@@ -53,4 +53,19 @@ Route::get('/api/propertyByMap', [PropertyApiController::class, 'getPropertiesIn
 
 Route::get('/api/getAllProperties', [PropertyApiController::class, 'getAllProperties'])->name('api.properties.all');
 
+Route::get('/wp/properties/{id}', [PropertyController::class, 'getPropertyDetails']);
+
+// Building details
+Route::get('/wp/buildings', [PropertyController::class, 'getBuildingDetails']);
+
+// Properties by location
+Route::get('/wp1/properties/search', [PropertyController::class, 'getPropertiesByLocation']);
+
+Route::get('/wp1/properties', [PropertyController::class, 'getProperties']);
+
+// In your routes file (web.php or api.php)
+Route::get('/wp1/map-properties/bounds', [PropertyController::class, 'getPropertiesInBounds']);
+
+
+
 require __DIR__.'/auth.php';
