@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Services;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
@@ -20,44 +20,10 @@ use App\Models\BridgeOffice;
 use App\Models\BridgeSchool;
 use Carbon\Carbon;
 
-class ImportPropertiesFromBridge extends Command
+
+class BridgeImportService
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    // protected $signature = 'bridge:import-properties 
-    //                         {--limit=100 : Number of properties to import} 
-    //                         {--offset=0 : Offset for pagination}
-    //                         {--status=Active : Property status to import (Active, Pending, Closed, etc.)}
-    //                         {--update : Update existing properties instead of skipping}';
 
-
-    protected $signature = 'bridge:import-properties 
-                        {--limit=200 : Number of properties per batch} 
-                        {--offset=0 : Starting offset for pagination}
-                        {--max=0 : Maximum number of properties to import (0 for all)}
-                        {--status=Active : Property status to import (Active, Pending, Closed, etc.)}
-                        {--update : Update existing properties instead of skipping}';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Import properties from Bridge API into the database';
-
-    /**
-     * Bridge API configuration
-     */
-    protected $apiUrl;
-    protected $apiKey;
-    protected $apiEndpoint;
-
-    /**
-     * Statistics tracking
-     */
     protected $stats = [
         'total' => 0,
         'created' => 0,
@@ -122,192 +88,40 @@ class ImportPropertiesFromBridge extends Command
         'InternetConsumerCommentYN'
     ];
 
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
+   
+    public function fetchPropertiesFromAPI($limit, $nextUrl = null)
     {
-        parent::__construct();
+        $apiKey = config('services.bridge.key');
 
-        $this->apiUrl = config('services.bridge.url', 'https://api.bridgedataoutput.com/api/v2');
-        $this->apiKey = config('services.bridge.key', "BRIDGE_API_KEY=f091fc0d25a293957350aa6a022ea4fb");
-        $this->apiEndpoint = config('services.bridge.endpoint', 'miamire/listings');
-    }
-
-    public function handle()
-    {
-        $this->info('Starting Bridge API property import...');
-
-        if (empty($this->apiKey)) {
-            $this->error('Bridge API key is not configured. Please set BRIDGE_API_KEY in your .env file.');
-            return 1;
+        if (strpos($apiKey, 'BRIDGE_API_KEY=') === 0) {
+            $apiKey = substr($apiKey, 15);
         }
 
-        $batchSize = $this->option('limit');
-        $offset = $this->option('offset');
-        $maxRecords = $this->option('max');
-        $status = $this->option('status');
-        $update = $this->option('update');
-
-        $this->info("Starting import with batch size: {$batchSize}, initial offset: {$offset}");
-        $this->info("Status filter: '{$status}', Update mode: " . ($update ? 'Yes' : 'No'));
-
-        try {
-            // Create feature categories if they don't exist
-            $this->createFeatureCategories();
-
-            $totalProcessed = 0;
-            $continueProcessing = true;
-
-            $this->info("Beginning batch processing...");
-            $nextUrl = null; // Start with the default (initial) request
-            $totalProcessed = 0;
-
-            while (true) {
-                $result = $this->fetchPropertiesFromAPI($batchSize, $nextUrl);
-                $properties = $result['properties'];
-                $nextUrl = $result['next']; // Get the next page URL
-
-                if (empty($properties)) {
-                    $this->info('No more properties found to import.');
-                    break;
-                }
-
-                $fetchedCount = count($properties);
-                $this->info("Batch: Processing {$fetchedCount} properties");
-
-                $this->withProgressBar($properties, function ($propertyData) use ($update) {
-                    try {
-                        DB::beginTransaction();
-                        $this->processProperty($propertyData, $update);
-                        DB::commit();
-                    } catch (\Exception $e) {
-                        DB::rollBack();
-                        $this->stats['failed']++;
-                        Log::error("Error processing property: " . $e->getMessage(), [
-                            'property' => $propertyData['ListingKey'] ?? 'unknown',
-                            'exception' => $e
-                        ]);
-                    }
-                });
-
-                $this->newLine();
-                $totalProcessed += $fetchedCount;
-                $this->info("Total processed so far: {$totalProcessed}");
-
-                if ($maxRecords > 0 && $totalProcessed >= $maxRecords) {
-                    $this->info("Reached maximum number of records to process ({$maxRecords}).");
-                    break;
-                }
-
-                if (!$nextUrl) {
-                    $this->info("No more pages to fetch.");
-                    break;
-                }
-
-                sleep(2); // prevent rate limiting
-            }
-            $this->newLine(2);
-            $this->displayStats();
-
-            return 0;
-        } catch (\Exception $e) {
-            $this->error("Error: " . $e->getMessage());
-            Log::error("Bridge API import error: " . $e->getMessage(), [
-                'exception' => $e
-            ]);
-            return 1;
+        // If it's the first request
+        if (!$nextUrl) {
+            $url = "https://api.bridgedataoutput.com/api/v2/OData/miamire/Property";
+            $params = [
+                'access_token' => 'f091fc0d25a293957350aa6a022ea4fb',
+                '$top' => $limit,
+            ];
+            $response = Http::get($url, $params);
+        } else {
+            // nextUrl already contains token and top, call it as-is
+            $response = Http::get($nextUrl);
         }
-    }
 
+        if (!$response->successful()) {
+            throw new \Exception("API request failed: " . $response->body());
+        }
 
-    protected function fetchPropertiesFromAPI($limit, $nextUrl = null)
-{
-    $apiKey = config('services.bridge.key');
+        $data = $response->json();
 
-    if (strpos($apiKey, 'BRIDGE_API_KEY=') === 0) {
-        $apiKey = substr($apiKey, 15);
-    }
-
-    // If it's the first request
-    if (!$nextUrl) {
-        $url = "https://api.bridgedataoutput.com/api/v2/OData/miamire/Property";
-        $params = [
-            'access_token' => 'f091fc0d25a293957350aa6a022ea4fb',
-            '$top' => $limit,
+        return [
+            'properties' => $data['value'] ?? [],
+            'next' => $data['@odata.nextLink'] ?? null,
         ];
-        $response = Http::get($url, $params);
-    } else {
-        // nextUrl already contains token and top, call it as-is
-        $response = Http::get($nextUrl);
     }
-
-    if (!$response->successful()) {
-        throw new \Exception("API request failed: " . $response->body());
-    }
-
-    $data = $response->json();
-
-    return [
-        'properties' => $data['value'] ?? [],
-        'next' => $data['@odata.nextLink'] ?? null,
-    ];
-}
-
-
-    // protected function fetchPropertiesFromAPI($limit, $nextUrl = null)
-    // {
-    //     $apiKey = config('services.bridge.key');
-
-    //     if (strpos($apiKey, 'BRIDGE_API_KEY=') === 0) {
-    //         $apiKey = substr($apiKey, 15);
-    //     }
-
-    //     // Build the initial request URL
-    //     $url = $nextUrl ?? "https://api.bridgedataoutput.com/api/v2/OData/miamire/Property";
-
-    //     $params = [
-    //         'access_token'=> 'f091fc0d25a293957350aa6a022ea4fb',
-    //         '$top' => $limit
-    //     ];
-
-    //     $response = Http::get($url,$params);
-
-    //     if (!$response->successful()) {
-    //         throw new \Exception("API request failed: " . $response->body());
-    //     }
-
-    //     $data = $response->json();
-    //     return [
-    //         'properties' => $data['value'] ?? [],
-    //         'next' => $data['@odata.nextLink'] ?? null,
-    //     ];
-    // }
-
-    // protected function fetchPropertiesFromAPI($limit, $offset, $status)
-    // {
-    //     // The API key should be just the token value, not the full "BRIDGE_API_KEY=token" string
-    //     $apiKey = config('services.bridge.key');
-
-    //     // Remove the "BRIDGE_API_KEY=" prefix if it exists
-    //     if (strpos($apiKey, 'BRIDGE_API_KEY=') === 0) {
-    //         $apiKey = substr($apiKey, 15);
-    //     }
-
-    //     $url = "https://api.bridgedataoutput.com/api/v2/miamire/listings?access_token=f091fc0d25a293957350aa6a022ea4fb&limit=$limit";
-
-    //     $response = Http::get($url);
-
-    //     if (!$response->successful()) {
-    //         throw new \Exception("API request failed: " . $response->body());
-    //     }
-
-    //     $data = $response->json();
-    //     return $data['bundle'] ?? [];
-    // }
-
+    
     protected function processProperty($propertyData, $update)
     {
         try {
@@ -382,15 +196,6 @@ class ImportPropertiesFromBridge extends Command
         }
     }
 
-
-    /**
-     * Map API property data to database attributes
-     *
-     * @param array $propertyData
-     * @param array $agentOfficeIds
-     * @param array $schoolIds
-     * @return array
-     */
     protected function mapPropertyAttributes($propertyData, $agentOfficeIds, $schoolIds)
     {
         return [
@@ -523,65 +328,6 @@ class ImportPropertiesFromBridge extends Command
         ];
     }
 
-    // protected function processAgentsAndOffices($propertyData)
-    // {
-    //     $agentOfficeIds = [];
-
-    //     // Process listing agent and office
-    //     if (!empty($propertyData['ListAgentKey'])) {
-    //         $listAgent = $this->findOrCreateAgent($propertyData, 'List');
-    //         $agentOfficeIds['list_agent_id'] = $listAgent->id;
-    //     }
-
-    //     if (!empty($propertyData['ListOfficeKey'])) {
-    //         $listOffice = $this->findOrCreateOffice($propertyData, 'List');
-    //         $agentOfficeIds['list_office_id'] = $listOffice->id;
-    //     }
-
-    //     // Process co-listing agent and office
-    //     if (!empty($propertyData['CoListAgentKey'])) {
-    //         $coListAgent = $this->findOrCreateAgent($propertyData, 'CoList');
-    //         $agentOfficeIds['co_list_agent_id'] = $coListAgent->id;
-    //     }
-
-    //     if (!empty($propertyData['CoListOfficeKey'])) {
-    //         $coListOffice = $this->findOrCreateOffice($propertyData, 'CoList');
-    //         $agentOfficeIds['co_list_office_id'] = $coListOffice->id;
-    //     }
-
-    //     // Process buyer agent and office
-    //     if (!empty($propertyData['BuyerAgentKey'])) {
-    //         $buyerAgent = $this->findOrCreateAgent($propertyData, 'Buyer');
-    //         $agentOfficeIds['buyer_agent_id'] = $buyerAgent->id;
-    //     }
-
-    //     // if (!empty($propertyData['BuyerOfficeKey'])) {
-    //     //     $buyerOffice = $this->findOrCreateOffice($propertyData, 'Buyer');
-    //     //     $agentOfficeIds['buyer_office_id'] = $buyerOffice->id;
-    //     // }   
-
-    //     if (!empty($propertyData['BuyerOfficeKey']) || !empty($propertyData['BuyerOfficeMlsId'])) {
-    //         $buyerOffice = $this->findOrCreateOffice($propertyData, 'Buyer');
-
-    //         if ($buyerOffice) {
-    //             $agentOfficeIds['buyer_office_id'] = $buyerOffice->id;
-    //         }
-    //     }
-
-    //     // Process co-buyer agent and office
-    //     if (!empty($propertyData['CoBuyerAgentKey'])) {
-    //         $coBuyerAgent = $this->findOrCreateAgent($propertyData, 'CoBuyer');
-    //         $agentOfficeIds['co_buyer_agent_id'] = $coBuyerAgent->id;
-    //     }
-
-    //     if (!empty($propertyData['CoBuyerOfficeKey'])) {
-    //         $coBuyerOffice = $this->findOrCreateOffice($propertyData, 'CoBuyer');
-    //         $agentOfficeIds['co_buyer_office_id'] = $coBuyerOffice->id;
-    //     }
-
-    //     return $agentOfficeIds;
-    // }
-
     protected function processAgentsAndOffices($propertyData)
     {
         $agentOfficeIds = [];
@@ -639,13 +385,6 @@ class ImportPropertiesFromBridge extends Command
         return $agentOfficeIds;
     }
 
-    /**
-     * Find or create an agent
-     *
-     * @param array $propertyData
-     * @param string $prefix
-     * @return \App\Models\Agent
-     */
     protected function findOrCreateAgent($propertyData, $prefix, $office = null)
     {
         $agentKey = $propertyData["{$prefix}AgentKey"] ?? null;
@@ -717,12 +456,6 @@ class ImportPropertiesFromBridge extends Command
         return $office;
     }
 
-    /**
-     * Process schools
-     *
-     * @param array $propertyData
-     * @return array
-     */
     protected function processSchools($propertyData)
     {
         $schoolIds = [];
@@ -748,13 +481,6 @@ class ImportPropertiesFromBridge extends Command
         return $schoolIds;
     }
 
-    /**
-     * Find or create a school
-     *
-     * @param string $schoolName
-     * @param string $schoolType
-     * @return \App\Models\School
-     */
     protected function findOrCreateSchool($schoolName, $schoolType)
     {
         if (empty($schoolName)) {
@@ -797,127 +523,6 @@ class ImportPropertiesFromBridge extends Command
 
         return $school;
     }
-
-    /**
-     * Process property details
-     *
-     * @param \App\Models\Property $property
-     * @param array $propertyData
-     * @return void
-     */
-    // protected function processPropertyDetails($property, $propertyData)
-    // {
-    //     $details = BridgePropertyDetail::firstOrNew(['property_id' => $property->id]);
-
-    //     // Helper function to safely convert any value to a string
-    //     $safeToString = function($value) {
-    //         if (is_array($value)) {
-    //             return json_encode($value);
-    //         } elseif (is_null($value)) {
-    //             return null;
-    //         } else {
-    //             return (string)$value;
-    //         }
-    //     };
-
-    //     // Process all fields that might be arrays
-    //     $processedData = [];
-
-    //     // Map all fields from the API to our database columns
-    //     $fieldMappings = [
-    //         'building_name' => 'BuildingName',
-    //         'subdivision_name' => 'SubdivisionName',
-    //         'building_area_total' => 'BuildingAreaTotal',
-    //         'building_area_units' => 'BuildingAreaUnits',
-    //         'building_area_source' => 'BuildingAreaSource',
-    //         'direction_faces' => 'DirectionFaces',
-    //         'property_condition' => 'PropertyCondition',
-    //         'zoning' => 'Zoning',
-    //         'tax_legal_description' => 'TaxLegalDescription',
-    //         'current_financing' => 'CurrentFinancing',
-    //         'possession' => 'Possession',
-    //         'showing_instructions' => 'ShowingInstructions',
-    //         'showing_contact_type' => 'ShowingContactType',
-    //         'availability_date' => 'AvailabilityDate',
-    //         'development_status' => 'DevelopmentStatus',
-    //         'ownership_type' => 'OwnershipType',
-    //         'special_listing_conditions' => 'SpecialListingConditions',
-    //         'listing_terms' => 'ListingTerms',
-    //         'listing_service' => 'ListingService',
-    //         'sign_on_property_yn' => 'SignOnPropertyYN',
-    //         'association_yn' => 'AssociationYN',
-    //         'disclosures' => 'Disclosures',
-    //         'home_warranty_yn' => 'HomeWarrantyYN',
-
-    //         // MIAMIRE specific fields
-    //         'miamire_adjusted_area_sf' => 'MIAMIRE_AdjustedAreaSF',
-    //         'miamire_lp_amt_sq_ft' => 'MIAMIRE_LPAmtSqFt',
-    //         'miamire_ratio_current_price_by_sqft' => 'MIAMIRE_RATIO_CurrentPrice_By_SQFT',
-    //         'miamire_area' => 'MIAMIRE_Area',
-    //         'miamire_style' => 'MIAMIRE_Style',
-    //         'miamire_internet_remarks' => 'MIAMIRE_InternetRemarks',
-    //         'miamire_pool_yn' => 'MIAMIRE_PoolYN',
-    //         'miamire_pool_dimensions' => 'MIAMIRE_PoolDimensions',
-    //         'miamire_membership_purch_rqd_yn' => 'MIAMIRE_MembershipPurchRqdYN',
-    //         'miamire_special_assessment_yn' => 'MIAMIRE_SpecialAssessmentYN',
-    //         'miamire_type_of_association' => 'MIAMIRE_TypeofAssociation',
-    //         'miamire_type_of_governing_bodies' => 'MIAMIRE_TypeofGoverningBodies',
-    //         'miamire_restrictions' => 'MIAMIRE_Restrictions',
-    //         'miamire_subdivision_information' => 'MIAMIRE_SubdivisionInformation',
-    //         'miamire_buyer_country_of_residence' => 'MIAMIRE_BuyerCountryofResidence',
-    //         'miamire_seller_contributions_yn' => 'MIAMIRE_SellerContributionsYN',
-    //         'miamire_seller_contributions_amt' => 'MiamireSellerContributionsAmt',
-    //     ];
-
-    //     // Process each field with safe conversion
-    //     $data = ['property_id' => $property->id];
-
-    //     foreach ($fieldMappings as $dbField => $apiField) {
-    //         if (isset($propertyData[$apiField])) {
-    //             $data[$dbField] = $safeToString($propertyData[$apiField]);
-    //         } else {
-    //             $data[$dbField] = null;
-    //         }
-    //     }
-
-    //     // Special handling for boolean fields
-    //     $booleanFields = [
-    //         'sign_on_property_yn', 'association_yn', 'home_warranty_yn',
-    //         'miamire_pool_yn', 'miamire_membership_purch_rqd_yn',
-    //         'miamire_special_assessment_yn', 'miamire_seller_contributions_yn'
-    //     ];
-
-    //     foreach ($booleanFields as $field) {
-    //         if (isset($data[$field])) {
-    //             $data[$field] = filter_var($data[$field], FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
-    //         }
-    //     }
-
-    //     // Special handling for numeric fields
-    //     $numericFields = [
-    //         'building_area_total', 'miamire_adjusted_area_sf', 
-    //         'miamire_lp_amt_sq_ft', 'miamire_ratio_current_price_by_sqft',
-    //         'miamire_seller_contributions_amt'
-    //     ];
-
-    //     foreach ($numericFields as $field) {
-    //         if (isset($data[$field]) && !is_null($data[$field])) {
-    //             $data[$field] = (float)$data[$field];
-    //         }
-    //     }
-
-    //     // Log the processed data for debugging
-    //     Log::info("Processed property details data for property ID {$property->id}", [
-    //         'raw_building_area_units' => $propertyData['BuildingAreaUnits'] ?? null,
-    //         'processed_building_area_units' => $data['building_area_units'],
-    //         'raw_property_condition' => $propertyData['PropertyCondition'] ?? null,
-    //         'processed_property_condition' => $data['property_condition']
-    //     ]);
-
-    //     // Fill the model with processed data
-    //     $details->fill($data);
-    //     $details->save();
-    // }
 
     protected function processPropertyDetails($property, $propertyData)
     {
@@ -1096,13 +701,6 @@ class ImportPropertiesFromBridge extends Command
         $details->save();
     }
 
-    /**
-     * Process property media
-     *
-     * @param \App\Models\Property $property
-     * @param array $propertyData
-     * @return void
-     */
     protected function processPropertyMedia($property, $propertyData)
     {
         if (empty($propertyData['Media'])) {
@@ -1135,13 +733,6 @@ class ImportPropertiesFromBridge extends Command
         }
     }
 
-    /**
-     * Process property features
-     *
-     * @param \App\Models\Property $property
-     * @param array $propertyData
-     * @return void
-     */
     protected function processPropertyFeatures($property, $propertyData)
     {
         // Clear existing features
@@ -1174,13 +765,6 @@ class ImportPropertiesFromBridge extends Command
         }
     }
 
-    /**
-     * Process property boolean features
-     *
-     * @param \App\Models\Property $property
-     * @param array $propertyData
-     * @return void
-     */
     protected function processPropertyBooleanFeatures($property, $propertyData)
     {
         // Clear existing boolean features
@@ -1196,13 +780,6 @@ class ImportPropertiesFromBridge extends Command
         }
     }
 
-    /**
-     * Process property tax information
-     *
-     * @param \App\Models\Property $property
-     * @param array $propertyData
-     * @return void
-     */
     protected function processPropertyTaxInformation($property, $propertyData)
     {
         try {
@@ -1240,13 +817,6 @@ class ImportPropertiesFromBridge extends Command
         }
     }
 
-    /**
-     * Process property financial data
-     *
-     * @param \App\Models\Property $property
-     * @param array $propertyData
-     * @return void
-     */
     protected function processPropertyFinancialData($property, $propertyData)
     {
         $financialData = BridgePropertyFinancialDetails::firstOrNew(['property_id' => $property->id]);
@@ -1288,14 +858,6 @@ class ImportPropertiesFromBridge extends Command
         $financialData->save();
     }
 
-
-    /**
-     * Process property lease information
-     *
-     * @param \App\Models\Property $property
-     * @param array $propertyData
-     * @return void
-     */
     protected function processPropertyLeaseInformation($property, $propertyData)
     {
         $leaseInfo = BridgePropertyLeaseInformation::firstOrNew(['property_id' => $property->id]);
@@ -1350,11 +912,6 @@ class ImportPropertiesFromBridge extends Command
     }
 
 
-    /**
-     * Create feature categories
-     *
-     * @return void
-     */
     protected function createFeatureCategories()
     {
         foreach ($this->featureCategories as $categoryName) {
@@ -1362,11 +919,6 @@ class ImportPropertiesFromBridge extends Command
         }
     }
 
-    /**
-     * Display import statistics
-     *
-     * @return void
-     */
     protected function displayStats()
     {
         $this->info('Import completed with the following results:');
