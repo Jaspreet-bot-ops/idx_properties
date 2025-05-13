@@ -61,7 +61,7 @@ Route::get('/wp/buildings', [PropertyController::class, 'getBuildingDetails']);
 // Properties by location
 Route::get('/wp1/properties/search', [PropertyController::class, 'getPropertiesByLocation']);
 
-Route::get('/wp1/properties', [PropertyController::class, 'getProperties']);
+Route::get('/api/wp1/properties', [PropertyController::class, 'getProperties']);
 
 // In your routes file (web.php or api.php)
 Route::get('/wp1/map-properties/bounds', [PropertyController::class, 'getPropertiesInBounds']);

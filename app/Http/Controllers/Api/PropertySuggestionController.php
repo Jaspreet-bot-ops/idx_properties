@@ -695,9 +695,19 @@ class PropertySuggestionController extends Controller
     // }
 
 
+    /**
+     * Provides autocomplete suggestions for property searches.
+     *
+     * This method generates suggestions across three categories: addresses, buildings, and places
+     * based on a user's search query. It supports filtering by property type (buy/rent) and 
+     * provides a flexible search across various property attributes.
+     *
+     * @param Request $request The HTTP request containing search parameters
+     * @return \Illuminate\Http\JsonResponse A JSON response with grouped suggestions
+     */
     public function autocomplete(Request $request)
     {
-
+        // dd($request->all());
         // dd("dfsfsdg");
         // Get search parameters - support both 'q' and 'query' parameters
         $query = $request->input('q') ?? $request->input('query');
@@ -832,36 +842,55 @@ class PropertySuggestionController extends Controller
                 ->keyBy('id');
         }
 
+        // $buildingQuery = DB::table('bridge_properties as bp')
+        //     ->select(
+        //         'bp.street_number',
+        //         'bp.street_name',
+        //         'bp.street_dir_prefix',
+        //         'bp.city',
+        //         'bp.state_or_province',
+        //         'bp.postal_code',
+        //         'bp.property_sub_type',
+        //         DB::raw('COUNT(*) as unit_count'),
+        //         DB::raw('MIN(bp.list_price) as min_price'),
+        //         DB::raw('MAX(bp.list_price) as max_price')
+        //     )
+        //     ->leftJoin('bridge_property_details as bpd', 'bp.id', '=', 'bpd.property_id')
+        //     ->whereNotNull('bp.street_number')
+        //     ->whereNotNull('bp.street_name')
+        //     ->whereNotIn('bp.property_sub_type', $individualPropertyTypes);
 
-        $buildingQuery = DB::table('bridge_properties as bp')
-            ->select(
-                'bp.street_number',
-                'bp.street_name',
-                'bp.street_dir_prefix',
-                'bp.city',
-                'bp.state_or_province',
-                'bp.postal_code',
-                'bp.property_sub_type',
-                DB::raw('COUNT(*) as unit_count'),
-                DB::raw('MIN(bp.list_price) as min_price'),
-                DB::raw('MAX(bp.list_price) as max_price')
-            )
-            ->leftJoin('bridge_property_details as bpd', 'bp.id', '=', 'bpd.property_id')
-            ->whereNotNull('bp.street_number')
-            ->whereNotNull('bp.street_name')
-            ->whereNotIn('bp.property_sub_type', $individualPropertyTypes);
+        // // Apply type filter to buildings
+        // if ($type) {
+        //     switch (strtolower($type)) {
+        //         case 'buy':
+        //             $buildingQuery->whereNotIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
+        //             break;
+        //         case 'rent':
+        //             $buildingQuery->whereIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
+        //             break;
+        //     }
+        // }
 
-        // Apply type filter to buildings
-        if ($type) {
-            switch (strtolower($type)) {
-                case 'buy':
-                    $buildingQuery->whereNotIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
-                    break;
-                case 'rent':
-                    $buildingQuery->whereIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
-                    break;
-            }
-        }
+        // $buildingQuery = DB::table('bridge_properties as bp')
+        //     ->select(
+        //         'bp.street_number',
+        //         'bp.street_name',
+        //         'bp.street_dir_prefix',
+        //         'bp.city',
+        //         'bp.state_or_province',
+        //         'bp.postal_code',
+        //         'bp.property_sub_type',
+        //         DB::raw('MAX(bpd.building_name) as building_name'), // Use MAX to aggregate building_name
+        //         DB::raw('COUNT(*) as unit_count'),
+        //         DB::raw('MIN(bp.list_price) as min_price'),
+        //         DB::raw('MAX(bp.list_price) as max_price')
+        //     )
+        //     ->leftJoin('bridge_property_details as bpd', 'bp.id', '=', 'bpd.property_id')
+        //     ->whereNotNull('bp.street_number')
+        //     ->whereNotNull('bp.street_name')
+        //     ->whereNotIn('bp.property_sub_type', $individualPropertyTypes);
+
 
         $buildingQuery = DB::table('bridge_properties as bp')
             ->select(
@@ -886,14 +915,17 @@ class PropertySuggestionController extends Controller
         if ($type) {
             switch (strtolower($type)) {
                 case 'buy':
-                    $buildingQuery->whereNotIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
+                    // Exclude leases using NOT LIKE
+                    $buildingQuery->where('bp.property_type', 'not like', '%Lease%');
                     break;
                 case 'rent':
-                    $buildingQuery->whereIn('bp.property_type', ['ResidentialLease', 'CommercialLease']);
+                    // Include only leases using LIKE
+                    $buildingQuery->where('bp.property_type', 'like', '%Lease%');
                     break;
             }
         }
 
+        // Continue with the rest of the query conditions
         $buildingQuery->where(function ($q) use ($query) {
             // Prioritize exact matches first
             $q->where(DB::raw("CONCAT(bp.street_number, ' ', bp.street_name)"), 'like', "{$query}%")
