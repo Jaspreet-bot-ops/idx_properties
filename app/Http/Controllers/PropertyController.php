@@ -2608,6 +2608,8 @@ class PropertyController extends Controller
                 return $media->media_url;
             }),
 
+            'SyndicationRemarks' => $property->syndication_remarks,
+
             'Property_details' => [
                 'Subdivision' => $property->details->subdivision_name ?? null,
                 'Style' => $property->details->miamire_style ?? null,
