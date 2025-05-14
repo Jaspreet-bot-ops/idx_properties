@@ -155,7 +155,7 @@ class BridgeImportService
             }
 
             // Check if property already exists
-            $property = BridgeProperty::where('listing_key', $listingKey)->first();
+            $property = BridgeProperty::with('details')->where('listing_key', $listingKey)->first();
 
             if ($property && !$update) {
                 $this->stats['skipped']++;
