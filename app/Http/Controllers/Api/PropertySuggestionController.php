@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\BridgeProperty;
 use App\Models\Property;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class PropertySuggestionController extends Controller
