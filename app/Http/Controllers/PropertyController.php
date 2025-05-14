@@ -2240,6 +2240,7 @@ class PropertyController extends Controller
             return [
                 'id' => $property->id,
                 'listing_key' => $property->listing_key,
+                'listing_id' => $property->listing_id,
                 'address' => trim($property->street_number . ' ' . $property->street_name),
                 'unit_number' => $property->unit_number,
                 'city' => $property->city,
