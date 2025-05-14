@@ -2679,11 +2679,11 @@ class PropertyController extends Controller
             ],
 
             'Room_Information' => [
-                'Room Description' => '-',
-                'Bedroom Description' => '-',
-                'Master Bathroom Description:' => '-',
-                'Master Bath Features' => '-',
-                'Dining Description' => '-',
+                'Room Description' =>$property->details->rooms_description ?? null,
+                'Bedroom Description' => $property->details->bedroom_description ?? null,
+                'Master Bathroom Description:' => $property->details->master_bathroom_description ?? null,
+                'Master Bath Features' => $property->details->master_bath_features ?? null,
+                'Dining Description' => $property->details->dining_description ?? null,
             ],
 
             'Additional_Property_Information' => [

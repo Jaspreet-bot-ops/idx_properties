@@ -78,17 +78,38 @@ class BridgeImportService
      * Boolean features to extract
      */
     protected $booleanFeatures = [
-        'CoolingYN', 'HeatingYN', 'GarageYN', 'AttachedGarageYN', 'CarportYN',
-        'OpenParkingYN', 'WaterfrontYN', 'ViewYN', 'PoolPrivateYN', 'SpaYN',
-        'FireplaceYN', 'HorseYN', 'NewConstructionYN', 'AssociationYN',
-        'SignOnPropertyYN', 'HomeWarrantyYN', 'LeaseConsideredYN', 'LandLeaseYN',
-        'LeaseAssignableYN', 'LeaseRenewalOptionYN', 'SeniorCommunityYN',
-        'PropertyAttachedYN', 'ElectricOnPropertyYN', 'HabitableResidenceYN',
-        'AdditionalParcelsYN', 'IDXParticipationYN', 'InternetAddressDisplayYN', 'InternetEntireListingDisplayYN',
+        'CoolingYN',
+        'HeatingYN',
+        'GarageYN',
+        'AttachedGarageYN',
+        'CarportYN',
+        'OpenParkingYN',
+        'WaterfrontYN',
+        'ViewYN',
+        'PoolPrivateYN',
+        'SpaYN',
+        'FireplaceYN',
+        'HorseYN',
+        'NewConstructionYN',
+        'AssociationYN',
+        'SignOnPropertyYN',
+        'HomeWarrantyYN',
+        'LeaseConsideredYN',
+        'LandLeaseYN',
+        'LeaseAssignableYN',
+        'LeaseRenewalOptionYN',
+        'SeniorCommunityYN',
+        'PropertyAttachedYN',
+        'ElectricOnPropertyYN',
+        'HabitableResidenceYN',
+        'AdditionalParcelsYN',
+        'IDXParticipationYN',
+        'InternetAddressDisplayYN',
+        'InternetEntireListingDisplayYN',
         'InternetConsumerCommentYN'
     ];
 
-   
+
     public function fetchPropertiesFromAPI($limit, $nextUrl = null)
     {
         $apiKey = config('services.bridge.key');
@@ -121,7 +142,7 @@ class BridgeImportService
             'next' => $data['@odata.nextLink'] ?? null,
         ];
     }
-    
+
     protected function processProperty($propertyData, $update)
     {
         try {
@@ -575,6 +596,13 @@ class BridgeImportService
             'disclosures' => 'Disclosures',
             'home_warranty_yn' => 'HomeWarrantyYN',
 
+            'rooms_description' => 'RoomLivingRoomFeatures',
+            'bedroom_description' => 'RoomBedroomFeatures',
+            'master_bathroom_description' => 'RoomMasterBathroomFeatures',
+            'master_bath_features' => 'RoomMasterBathroomFeatures',
+            'dining_description' => 'RoomDiningRoomFeatures',
+            'rooms_total' => 'RoomsTotal',
+
             // MIAMIRE specific fields
             'miamire_adjusted_area_sf' => 'MIAMIRE_AdjustedAreaSF',
             'miamire_lp_amt_sq_ft' => 'MIAMIRE_LPAmtSqFt',
@@ -867,8 +895,11 @@ class BridgeImportService
 
         // Fields that might be arrays and need to be converted to JSON
         $arrayFields = [
-            'LeaseTerm', 'ExistingLeaseType', 'MiamireLengthOfRental',
-            'MiamirePetFeeDesc', 'MiamireRentLengthDesc'
+            'LeaseTerm',
+            'ExistingLeaseType',
+            'MiamireLengthOfRental',
+            'MiamirePetFeeDesc',
+            'MiamireRentLengthDesc'
         ];
 
         // Process fields that might be arrays
