@@ -2546,19 +2546,19 @@ class PropertyController extends Controller
             return !empty($features) ? implode(', ', $features) : null;
         };
 
-            $jsonToCommaString = function($jsonString) {
-        if (empty($jsonString)) return null;
-        
-        try {
-            $array = json_decode($jsonString, true);
-            if (is_array($array) && !empty($array)) {
-                return implode(', ', $array);
+        $jsonToCommaString = function ($jsonString) {
+            if (empty($jsonString)) return null;
+
+            try {
+                $array = json_decode($jsonString, true);
+                if (is_array($array) && !empty($array)) {
+                    return implode(', ', $array);
+                }
+                return $jsonString; // Return original if not a valid JSON array
+            } catch (\Exception $e) {
+                return $jsonString; // Return original on error
             }
-            return $jsonString; // Return original if not a valid JSON array
-        } catch (\Exception $e) {
-            return $jsonString; // Return original on error
-        }
-    };
+        };
 
         // Get specific feature categories
         $heatingFeatures = $getFeaturesByCategory('Heating');
@@ -2577,9 +2577,9 @@ class PropertyController extends Controller
         $constructionMaterials = $getFeaturesByCategory('Construction Materials');
         $flooringFeatures = $getFeaturesByCategory('Flooring');
         $communityFeatures = $getFeaturesByCategory('Community Features');
-    $guestHouseDescription = $jsonToCommaString($property->details->miamire_guest_house_description ?? null);
-    $typeOfAssociation = $jsonToCommaString($property->details->miamire_type_of_association ?? null);
-    $subdivisionInformation = $jsonToCommaString($property->details->miamire_subdivision_information ?? null);
+        $guestHouseDescription = $jsonToCommaString($property->details->miamire_guest_house_description ?? null);
+        $typeOfAssociation = $jsonToCommaString($property->details->miamire_type_of_association ?? null);
+        $subdivisionInformation = $jsonToCommaString($property->details->miamire_subdivision_information ?? null);
         // Format the property data in the requested format
         $formattedProperty = [
             'id' => $property->id,
@@ -2590,7 +2590,7 @@ class PropertyController extends Controller
             'HOA' => $property->association_fee,
             'PropertyType' => $property->property_sub_type,
             'YearBuilt' => $property->year_built,
-            'LotSize' => $property->lot_size_square_feet . ' ' . $property->lot_size_units,
+            'LotSize' => $property->living_area . ' Sqft',
             'County' => $property->county_or_parish,
             'listing_id' => $property->listing_id,
             'listing_key' => $property->listing_key,
@@ -2603,7 +2603,7 @@ class PropertyController extends Controller
             'postal_code' => $property->postal_code,
             'price' => $property->list_price,
             'bedrooms' => $property->bedrooms_total,
-            'bathrooms' => $property->bathrooms_total_decimal,
+            'bathrooms' => $property->bathrooms_full,
             'photos' => $property->media->map(function ($media) {
                 return $media->media_url;
             }),
@@ -2615,7 +2615,8 @@ class PropertyController extends Controller
                 'Style' => $property->details->miamire_style ?? null,
                 'WaterFront' => $property->waterfront_yn ?? null,
                 'View' => $property->details->view ?? null,
-                'Furnished' => $property->furnished ?? null,
+                'Water Description' => $waterFeatures,
+                // 'Furnished' => $property->furnished ?? null,
                 'Area' => $property->details->miamire_area ?? null,
                 'Sqft Total' => $property->details->building_area_total ?? null,
                 'Sqft LivArea' => $property->living_area ?? null,
@@ -2625,6 +2626,7 @@ class PropertyController extends Controller
 
             'Building_Information' => [
                 'Stories' => $property->stories_total ?? null,
+                'Building Size' => '-',
                 'YearBuilt' => $property->year_built ?? null,
                 'Lot Size' => $property->lot_size_square_feet . ' ' . $property->lot_size_units
             ],
@@ -2644,7 +2646,7 @@ class PropertyController extends Controller
                 'Num Carport Space' => $property->carport_spaces ?? null,
                 'Parking Description' => $parkingFeatures,
                 'Spa' => $property->spa_yn ?? null,
-                'Pool' => $property->pool_private_yn ?? null,
+                'Pool' => $property->miamire_pool_yn ?? null,
                 'Pool Description' => $poolFeatures,
                 'Front Exposure' => $property->details->direction_faces ?? null,
                 'Approximate LotSize' => $property->lot_size_square_feet ?? null,
