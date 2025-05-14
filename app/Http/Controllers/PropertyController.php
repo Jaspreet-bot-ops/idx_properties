@@ -6,6 +6,7 @@ use App\Models\BridgeProperty;
 use App\Models\Property;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 class PropertyController extends Controller
 {
@@ -2431,107 +2432,107 @@ class PropertyController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    // public function getNearbyProperties(Request $request)
-    // {
-    //     // Validate request parameters
-    //     $request->validate([
-    //         'latitude' => 'required|numeric',
-    //         'longitude' => 'required|numeric',
-    //         'radius' => 'nullable|numeric|min:0.1|max:50',
-    //         'limit' => 'nullable|integer|min:1|max:50',
-    //         'property_type' => 'nullable|string',
-    //         'min_price' => 'nullable|numeric',
-    //         'max_price' => 'nullable|numeric',
-    //     ]);
+    public function getNearbyProperties(Request $request)
+    {
+        // Validate request parameters
+        $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius' => 'nullable|numeric|min:0.1|max:50',
+            'limit' => 'nullable|integer|min:1|max:50',
+            'property_type' => 'nullable|string',
+            'min_price' => 'nullable|numeric',
+            'max_price' => 'nullable|numeric',
+        ]);
 
-    //     $latitude = $request->input('latitude');
-    //     $longitude = $request->input('longitude');
-    //     $radius = $request->input('radius', 5); // Default 5 miles
-    //     $limit = $request->input('limit', 10); // Default 10 properties
+        $latitude = $request->input('latitude');
+        $longitude = $request->input('longitude');
+        $radius = $request->input('radius', 5); // Default 5 miles
+        $limit = $request->input('limit', 15); // Default 10 properties
 
-    //     // Get access token from config
-    //     $accessToken = config('services.trestle.access_token');
-    //     $datasetId = config('services.trestle.dataset_id');
+        // Get access token from config
+        $accessToken = config('services.trestle.access_token');
+        $datasetId = config('services.trestle.dataset_id');
 
-    //     // If we don't have a stored token, try to get one
+        // If we don't have a stored token, try to get one
 
-    //     // Build the API URL
-    //     $apiUrl = "https://api.bridgedataoutput.com/api/v2/{$datasetId}/listings";
+        // Build the API URL
+        $apiUrl = "https://api.bridgedataoutput.com/api/v2/{$datasetId}/listings";
 
-    //     // Build query parameters
-    //     $queryParams = [
-    //         'access_token' => 'f091fc0d25a293957350aa6a022ea4fb',
-    //         'limit' => 12,
-    //         'near' => "{$longitude},{$latitude}",
-    //         'radius' => "{$radius}mi",
-    //         'sortBy' => 'distance',
-    //     ];
+        // Build query parameters
+        $queryParams = [
+            'access_token' => 'f091fc0d25a293957350aa6a022ea4fb',
+            'limit' => 15,
+            'near' => "{$longitude},{$latitude}",
+            'radius' => "{$radius}mi",
+            'sortBy' => 'distance',
+        ];
 
-    //     // Add optional filters
-    //     if ($request->filled('property_type')) {
-    //         $queryParams['PropertyType'] = $request->input('property_type');
-    //     }
+        // Add optional filters
+        if ($request->filled('property_type')) {
+            $queryParams['PropertyType'] = $request->input('property_type');
+        }
 
-    //     if ($request->filled('min_price')) {
-    //         $queryParams['ListPrice.gte'] = $request->input('min_price');
-    //     }
+        if ($request->filled('min_price')) {
+            $queryParams['ListPrice.gte'] = $request->input('min_price');
+        }
 
-    //     if ($request->filled('max_price')) {
-    //         $queryParams['ListPrice.lte'] = $request->input('max_price');
-    //     }
+        if ($request->filled('max_price')) {
+            $queryParams['ListPrice.lte'] = $request->input('max_price');
+        }
 
-    //     try {
-    //         // Make the API request
-    //         $response = Http::get($apiUrl, $queryParams);
+        try {
+            // Make the API request
+            $response = Http::get($apiUrl, $queryParams);
 
-    //         // Check if the request was successful
-    //         if (!$response->successful()) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Error fetching nearby properties',
-    //                 'error' => $response->body()
-    //             ], $response->status());
-    //         }
+            // Check if the request was successful
+            if (!$response->successful()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error fetching nearby properties',
+                    'error' => $response->body()
+                ], $response->status());
+            }
 
-    //         $data = $response->json();
+            $data = $response->json();
 
-    //         // Format the response
-    //         $properties = collect($data['bundle'] ?? []);
+            // Format the response
+            $properties = collect($data['bundle'] ?? []);
 
-    //         $formattedProperties = $properties->map(function ($property) {
-    //             return [
-    //                 'listing_id' => $property['ListingId'] ?? null,
-    //                 'listing_key' => $property['ListingKey'] ?? null,
-    //                 'address' => trim(($property['StreetNumber'] ?? '') . ' ' . ($property['StreetName'] ?? '')),
-    //                 'unit_number' => $property['UnitNumber'] ?? null,
-    //                 'city' => $property['City'] ?? null,
-    //                 'state' => $property['StateOrProvince'] ?? null,
-    //                 'postal_code' => $property['PostalCode'] ?? null,
-    //                 'price' => $property['ListPrice'] ?? null,
-    //                 'bedrooms' => $property['BedroomsTotal'] ?? null,
-    //                 'bathrooms' => $property['BathroomsTotalDecimal'] ?? null,
-    //                 'living_area' => $property['LivingArea'] ?? null,
-    //                 'property_type' => $property['PropertyType'] ?? null,
-    //                 'property_sub_type' => $property['PropertySubType'] ?? null,
-    //                 'year_built' => $property['YearBuilt'] ?? null,
-    //                 'photos' => collect($property['Media'] ?? [])->pluck('MediaURL'),
-    //                 'distance' => $property['distance'] ?? null,
-    //             ];
-    //         });
+            $formattedProperties = $properties->map(function ($property) {
+                return [
+                    'listing_id' => $property['ListingId'] ?? null,
+                    'listing_key' => $property['ListingKey'] ?? null,
+                    'address' => trim(($property['StreetNumber'] ?? '') . ' ' . ($property['StreetName'] ?? '')),
+                    'unit_number' => $property['UnitNumber'] ?? null,
+                    'city' => $property['City'] ?? null,
+                    'state' => $property['StateOrProvince'] ?? null,
+                    'postal_code' => $property['PostalCode'] ?? null,
+                    'price' => $property['ListPrice'] ?? null,
+                    'bedrooms' => $property['BedroomsTotal'] ?? null,
+                    'bathrooms' => $property['BathroomsTotalDecimal'] ?? null,
+                    'living_area' => $property['LivingArea'] ?? null,
+                    'property_type' => $property['PropertyType'] ?? null,
+                    'property_sub_type' => $property['PropertySubType'] ?? null,
+                    'year_built' => $property['YearBuilt'] ?? null,
+                    'photos' => collect($property['Media'] ?? [])->pluck('MediaURL'),
+                    'distance' => $property['distance'] ?? null,
+                ];
+            });
 
-    //         return response()->json([
-    //             'success' => true,
-    //             'properties' => $formattedProperties,
-    //             'total' => $data['total'] ?? count($formattedProperties),
-    //         ]);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Error fetching nearby properties',
-    //             'error' => $e->getMessage()
-    //         ], 500);
-    //     }
-    // }
+            return response()->json([
+                'success' => true,
+                'properties' => $formattedProperties,
+                'total' => $data['total'] ?? count($formattedProperties),
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching nearby properties',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
     /**
      * Get nearby properties using local database
@@ -2644,124 +2645,124 @@ class PropertyController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getNearbyProperties(Request $request)
-    {
-        // Validate request parameters
-        $request->validate([
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'radius' => 'nullable|numeric|min:0.1|max:50',
-            'limit' => 'nullable|integer|min:1|max:50',
-            'property_type' => 'nullable|string',
-            'min_price' => 'nullable|numeric',
-            'max_price' => 'nullable|numeric',
-        ]);
+    // public function getNearbyProperties(Request $request)
+    // {
+    //     // Validate request parameters
+    //     $request->validate([
+    //         'latitude' => 'required|numeric',
+    //         'longitude' => 'required|numeric',
+    //         'radius' => 'nullable|numeric|min:0.1|max:50',
+    //         'limit' => 'nullable|integer|min:1|max:50',
+    //         'property_type' => 'nullable|string',
+    //         'min_price' => 'nullable|numeric',
+    //         'max_price' => 'nullable|numeric',
+    //     ]);
 
-        $latitude = $request->input('latitude');
-        $longitude = $request->input('longitude');
-        $radius = $request->input('radius', 5); // Default 5 miles
-        $limit = $request->input('limit', 12); // Default 12 properties
+    //     $latitude = $request->input('latitude');
+    //     $longitude = $request->input('longitude');
+    //     $radius = $request->input('radius', 5); // Default 5 miles
+    //     $limit = $request->input('limit', 12); // Default 12 properties
 
-        // Convert miles to degrees (approximate conversion)
-        $latRadius = $radius / 69;
-        $longRadius = $radius / (69 * cos(deg2rad($latitude)));
+    //     // Convert miles to degrees (approximate conversion)
+    //     $latRadius = $radius / 69;
+    //     $longRadius = $radius / (69 * cos(deg2rad($latitude)));
 
-        // Query properties within the radius
-        $query = BridgeProperty::with(['media', 'details'])
-            ->whereBetween('latitude', [$latitude - $latRadius, $latitude + $latRadius])
-            ->whereBetween('longitude', [$longitude - $longRadius, $longitude + $longRadius]);
+    //     // Query properties within the radius
+    //     $query = BridgeProperty::with(['media', 'details'])
+    //         ->whereBetween('latitude', [$latitude - $latRadius, $latitude + $latRadius])
+    //         ->whereBetween('longitude', [$longitude - $longRadius, $longitude + $longRadius]);
 
-        // Add optional filters
-        if ($request->filled('property_type')) {
-            $query->where('property_type', $request->input('property_type'));
-        }
+    //     // Add optional filters
+    //     if ($request->filled('property_type')) {
+    //         $query->where('property_type', $request->input('property_type'));
+    //     }
 
-        if ($request->filled('min_price')) {
-            $query->where('list_price', '>=', $request->input('min_price'));
-        }
+    //     if ($request->filled('min_price')) {
+    //         $query->where('list_price', '>=', $request->input('min_price'));
+    //     }
 
-        if ($request->filled('max_price')) {
-            $query->where('list_price', '<=', $request->input('max_price'));
-        }
+    //     if ($request->filled('max_price')) {
+    //         $query->where('list_price', '<=', $request->input('max_price'));
+    //     }
 
-        // Calculate distance using Haversine formula
-        $haversine = "(
-        6371 * acos(
-            cos(radians($latitude)) 
-            * cos(radians(latitude)) 
-            * cos(radians(longitude) - radians($longitude)) 
-            + sin(radians($latitude)) 
-            * sin(radians(latitude))
-        )
-    )";
+    //     // Calculate distance using Haversine formula
+    //     $haversine = "(
+    //     6371 * acos(
+    //         cos(radians($latitude)) 
+    //         * cos(radians(latitude)) 
+    //         * cos(radians(longitude) - radians($longitude)) 
+    //         + sin(radians($latitude)) 
+    //         * sin(radians(latitude))
+    //     )
+    //     )";
 
-        // Add the distance calculation to the query
-        $query->selectRaw("*, $haversine AS distance");
+    //     // Add the distance calculation to the query
+    //     $query->selectRaw("*, $haversine AS distance");
 
-        // Filter by distance (convert miles to km - 1 mile = 1.60934 km)
-        $radiusKm = $radius * 1.60934;
-        $query->whereRaw("$haversine < ?", [$radiusKm]);
+    //     // Filter by distance (convert miles to km - 1 mile = 1.60934 km)
+    //     $radiusKm = $radius * 1.60934;
+    //     $query->whereRaw("$haversine < ?", [$radiusKm]);
 
-        // Order by distance
-        $query->orderBy('distance', 'asc');
+    //     // Order by distance
+    //     $query->orderBy('distance', 'asc');
 
-        // Apply limit
-        $properties = $query->limit($limit)->get();
+    //     // Apply limit
+    //     $properties = $query->limit($limit)->get();
 
-        // Format the response to match Bridge API format
-        $formattedProperties = $properties->map(function ($property) {
-            // Convert distance from km to miles
-            $distanceInMiles = round($property->distance * 0.621371, 2);
+    //     // Format the response to match Bridge API format
+    //     $formattedProperties = $properties->map(function ($property) {
+    //         // Convert distance from km to miles
+    //         $distanceInMiles = round($property->distance * 0.621371, 2);
 
-            // Create a response that matches the Bridge API format
-            return [
-                // Use the exact field names from Bridge API
-                'ListingId' => $property->listing_id,
-                'ListingKey' => $property->listing_key,
-                'StreetNumber' => $property->street_number,
-                'StreetName' => $property->street_name,
-                'UnitNumber' => $property->unit_number,
-                'City' => $property->city,
-                'StateOrProvince' => $property->state_or_province,
-                'PostalCode' => $property->postal_code,
-                'CountyOrParish' => $property->county_or_parish,
-                'ListPrice' => $property->list_price,
-                'BedroomsTotal' => $property->bedrooms_total,
-                'BathroomsTotalDecimal' => $property->bathrooms_total_decimal,
-                'LivingArea' => $property->living_area,
-                'LivingAreaUnits' => $property->living_area_units,
-                'LotSizeAcres' => $property->lot_size_acres,
-                'PropertyType' => $property->property_type,
-                'PropertySubType' => $property->property_sub_type,
-                'YearBuilt' => $property->year_built,
-                'StandardStatus' => $property->standard_status,
-                'PublicRemarks' => $property->public_remarks,
-                'Latitude' => $property->latitude,
-                'Longitude' => $property->longitude,
+    //         // Create a response that matches the Bridge API format
+    //         return [
+    //             // Use the exact field names from Bridge API
+    //             'ListingId' => $property->listing_id,
+    //             'ListingKey' => $property->listing_key,
+    //             'StreetNumber' => $property->street_number,
+    //             'StreetName' => $property->street_name,
+    //             'UnitNumber' => $property->unit_number,
+    //             'City' => $property->city,
+    //             'StateOrProvince' => $property->state_or_province,
+    //             'PostalCode' => $property->postal_code,
+    //             'CountyOrParish' => $property->county_or_parish,
+    //             'ListPrice' => $property->list_price,
+    //             'BedroomsTotal' => $property->bedrooms_total,
+    //             'BathroomsTotalDecimal' => $property->bathrooms_total_decimal,
+    //             'LivingArea' => $property->living_area,
+    //             'LivingAreaUnits' => $property->living_area_units,
+    //             'LotSizeAcres' => $property->lot_size_acres,
+    //             'PropertyType' => $property->property_type,
+    //             'PropertySubType' => $property->property_sub_type,
+    //             'YearBuilt' => $property->year_built,
+    //             'StandardStatus' => $property->standard_status,
+    //             'PublicRemarks' => $property->public_remarks,
+    //             'Latitude' => $property->latitude,
+    //             'Longitude' => $property->longitude,
 
-                // Include media in the format Bridge API uses
-                'Media' => $property->media->map(function ($media) {
-                    return [
-                        'MediaURL' => $media->media_url,
-                        'MediaType' => $media->media_type,
-                        'Order' => $media->order,
-                        'Description' => $media->description
-                    ];
-                }),
+    //             // Include media in the format Bridge API uses
+    //             'Media' => $property->media->map(function ($media) {
+    //                 return [
+    //                     'MediaURL' => $media->media_url,
+    //                     'MediaType' => $media->media_type,
+    //                     'Order' => $media->order,
+    //                     'Description' => $media->description
+    //                 ];
+    //             }),
 
-                // Add the calculated distance
-                'distance' => $distanceInMiles,
+    //             // Add the calculated distance
+    //             'distance' => $distanceInMiles,
 
-                // Include any additional fields that might be needed
-                'id' => $property->id, // Keep your internal ID for reference
-            ];
-        });
+    //             // Include any additional fields that might be needed
+    //             'id' => $property->id, // Keep your internal ID for reference
+    //         ];
+    //     });
 
-        // Structure the response to match Bridge API format
-        return response()->json([
-            'success' => true,
-            'bundle' => $formattedProperties,
-            'total' => $properties->count(),
-        ]);
-    }
+    //     // Structure the response to match Bridge API format
+    //     return response()->json([
+    //         'success' => true,
+    //         'bundle' => $formattedProperties,
+    //         'total' => $properties->count(),
+    //     ]);
+    // }
 }
