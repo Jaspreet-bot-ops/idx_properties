@@ -2630,10 +2630,10 @@ class PropertyController extends Controller
             'Property_Information' => [
                 'Parcel Number' => $property->parcel_number ?? null,
                 'Parcel Number MLX' => $property->parcel_number ? substr($property->parcel_number, -4) : null,
-                'MlsArea' => $property->details->public_survey_township ?? null,
+                'MlsArea' => $property->taxInformation->public_survey_township ?? null,
                 'TownshipRange' => $property->taxInformation->public_survey_range ?? null,
                 'Section' => $property->taxInformation->public_survey_section ?? null,
-                'Subdivision Complex Bldg' => $property->taxInformation->subdivision_name ?? null,
+                'Subdivision Complex Bldg' => $property->details->subdivision_name ?? null,
                 'Zoning Information' => $property->details->zoning ?? null
             ],
 
