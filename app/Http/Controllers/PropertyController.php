@@ -2523,6 +2523,7 @@ class PropertyController extends Controller
             'features.category', // Include the category relationship
             'booleanFeatures',
             'taxInformation',
+            'listAgent',
         ])->where('listing_id', $listingId)->first();
 
         if (!$property) {
@@ -2666,6 +2667,11 @@ class PropertyController extends Controller
                 'Assoc fee paid per' => $property->association_fee_frequency ?? null,
                 'Tax Year' => $property->tax_year ?? null,
                 'Tax Information' => $property->details->tax_legal_description ?? null
+            ],
+
+            'Agent_Info' => [
+                'Full Name' => $property->listAgent->full_name,
+                'Office Name' => $property->listAgent->office_name
             ],
 
             'Room_Information' => [
