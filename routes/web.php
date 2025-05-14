@@ -53,21 +53,23 @@ Route::get('/api/propertyByMap', [PropertyApiController::class, 'getPropertiesIn
 
 Route::get('/api/getAllProperties', [PropertyApiController::class, 'getAllProperties'])->name('api.properties.all');
 
-Route::get('/wp/properties/{id}', [PropertyController::class, 'getPropertyDetails']);
+// Route::get('/wp/properties/{id}', [PropertyController::class, 'getPropertyDetails']);
 
-// Building details
-Route::get('/wp/buildings', [PropertyController::class, 'getBuildingDetails']);
+// // Building details
+// Route::get('/wp/buildings', [PropertyController::class, 'getBuildingDetails']);
 
-// Properties by location
-Route::get('/wp1/properties/search', [PropertyController::class, 'getPropertiesByLocation']);
+// // Properties by location
+// Route::get('/wp1/properties/search', [PropertyController::class, 'getPropertiesByLocation']);
 
 Route::get('/api/wp1/properties', [PropertyController::class, 'getProperties']);
 
 // In your routes file (web.php or api.php)
-Route::get('/wp1/map-properties/bounds', [PropertyController::class, 'getPropertiesInBounds']);
+Route::get('/api/wp1/map-properties/bounds', [PropertyController::class, 'getPropertiesInBounds']);
 
 // Get nearby properties from local database
-Route::get('/api/wpi/properties/nearby', [PropertyController::class, 'getNearbyProperties']);
+Route::get('/api/wp1/properties/nearby', [PropertyController::class, 'getNearbyProperties']);
 
+// Get property by listing ID
+Route::get('api/wp1/properties/listing/{listingId}', [PropertyController::class, 'getPropertyByListingId']);
 
 require __DIR__.'/auth.php';

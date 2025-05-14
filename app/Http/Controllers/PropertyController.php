@@ -2393,27 +2393,7 @@ class PropertyController extends Controller
 
     public function getPropertyByListingId($listingId)
     {
-        $property = BridgeProperty::with([
-            'details',
-            'media',
-            'features',
-            'booleanFeatures',
-            'taxInformation',
-            'financialDetails',
-            'leaseInformation',
-            'listAgent',
-            'coListAgent',
-            'buyerAgent',
-            'coBuyerAgent',
-            'listOffice',
-            'coListOffice',
-            'buyerOffice',
-            'coBuyerOffice',
-            'schools',
-            'elementarySchool',
-            'middleSchool',
-            'highSchool'
-        ])->where('listing_id', $listingId)->first();
+        $property = BridgeProperty::with(['details', 'media', 'features'])->where('listing_id', $listingId)->first();
 
         if (!$property) {
             return response()->json([
