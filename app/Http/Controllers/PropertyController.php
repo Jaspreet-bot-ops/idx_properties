@@ -2772,6 +2772,7 @@ class PropertyController extends Controller
                 return [
                     'listing_id' => $property['ListingId'] ?? null,
                     'listing_key' => $property['ListingKey'] ?? null,
+                    'building_name' => $property['BuildingName'] ?? null,
                     'address' => trim(($property['StreetNumber'] ?? '') . ' ' . ($property['StreetName'] ?? '')),
                     'unit_number' => $property['UnitNumber'] ?? null,
                     'city' => $property['City'] ?? null,
