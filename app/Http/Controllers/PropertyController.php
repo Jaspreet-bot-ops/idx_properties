@@ -2457,7 +2457,7 @@ class PropertyController extends Controller
         // If we don't have a stored token, try to get one
 
         // Build the API URL
-        $apiUrl = "https://api.bridgedataoutput.com/api/v2/{$datasetId}/listings";
+        $apiUrl = "https://api.bridgedataoutput.com/api/v2/miamire/listings";
 
         // Build query parameters
         $queryParams = [
@@ -2467,19 +2467,6 @@ class PropertyController extends Controller
             'radius' => "{$radius}mi",
             'sortBy' => 'distance',
         ];
-
-        // Add optional filters
-        if ($request->filled('property_type')) {
-            $queryParams['PropertyType'] = $request->input('property_type');
-        }
-
-        if ($request->filled('min_price')) {
-            $queryParams['ListPrice.gte'] = $request->input('min_price');
-        }
-
-        if ($request->filled('max_price')) {
-            $queryParams['ListPrice.lte'] = $request->input('max_price');
-        }
 
         try {
             // Make the API request
