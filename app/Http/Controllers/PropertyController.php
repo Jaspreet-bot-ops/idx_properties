@@ -2539,6 +2539,111 @@ class PropertyController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
+    // public function getNearbyProperties(Request $request)
+    // {
+    //     // Validate request parameters
+    //     $request->validate([
+    //         'latitude' => 'required|numeric',
+    //         'longitude' => 'required|numeric',
+    //         'radius' => 'nullable|numeric|min:0.1|max:50',
+    //         'limit' => 'nullable|integer|min:1|max:50',
+    //         'property_type' => 'nullable|string',
+    //         'min_price' => 'nullable|numeric',
+    //         'max_price' => 'nullable|numeric',
+    //     ]);
+
+    //     $latitude = $request->input('latitude');
+    //     $longitude = $request->input('longitude');
+    //     $radius = $request->input('radius', 5); // Default 5 miles
+    //     $limit = $request->input('limit', 12); // Default 12 properties
+
+    //     // Convert miles to degrees (approximate conversion)
+    //     // 1 degree of latitude is approximately 69 miles
+    //     // 1 degree of longitude varies based on latitude, but we'll use a simplified approach
+    //     $latRadius = $radius / 69;
+    //     $longRadius = $radius / (69 * cos(deg2rad($latitude)));
+
+    //     // Query properties within the radius
+    //     $query = BridgeProperty::with(['media'])
+    //         ->whereBetween('latitude', [$latitude - $latRadius, $latitude + $latRadius])
+    //         ->whereBetween('longitude', [$longitude - $longRadius, $longitude + $longRadius]);
+
+    //     // Add optional filters
+    //     if ($request->filled('property_type')) {
+    //         $query->where('property_type', $request->input('property_type'));
+    //     }
+
+    //     if ($request->filled('min_price')) {
+    //         $query->where('list_price', '>=', $request->input('min_price'));
+    //     }
+
+    //     if ($request->filled('max_price')) {
+    //         $query->where('list_price', '<=', $request->input('max_price'));
+    //     }
+
+    //     // Calculate distance and add it to the query
+    //     // Using Haversine formula to calculate distance
+    //     $haversine = "(
+    //     6371 * acos(
+    //         cos(radians($latitude)) 
+    //         * cos(radians(latitude)) 
+    //         * cos(radians(longitude) - radians($longitude)) 
+    //         + sin(radians($latitude)) 
+    //         * sin(radians(latitude))
+    //     )
+    // )";
+
+    //     // Add the distance calculation to the query
+    //     $query->selectRaw("*, $haversine AS distance");
+
+    //     // Filter by distance (convert miles to km - 1 mile = 1.60934 km)
+    //     $radiusKm = $radius * 1.60934;
+    //     $query->whereRaw("$haversine < ?", [$radiusKm]);
+
+    //     // Order by distance
+    //     $query->orderBy('distance', 'asc');
+
+    //     // Apply limit
+    //     $properties = $query->limit($limit)->get();
+
+    //     // Format the response
+    //     $formattedProperties = $properties->map(function ($property) {
+    //         return [
+    //             'id' => $property->id,
+    //             'listing_id' => $property->listing_id,
+    //             'listing_key' => $property->listing_key,
+    //             'address' => trim($property->street_number . ' ' . $property->street_name),
+    //             'unit_number' => $property->unit_number,
+    //             'city' => $property->city,
+    //             'state' => $property->state_or_province,
+    //             'postal_code' => $property->postal_code,
+    //             'price' => $property->list_price,
+    //             'bedrooms' => $property->bedrooms_total,
+    //             'bathrooms' => $property->bathrooms_total_decimal,
+    //             'living_area' => $property->living_area,
+    //             'property_type' => $property->property_type,
+    //             'property_sub_type' => $property->property_sub_type,
+    //             'year_built' => $property->year_built,
+    //             'photos' => $property->media->map(function ($media) {
+    //                 return $media->media_url;
+    //             }),
+    //             'distance' => round($property->distance * 0.621371, 2), // Convert km back to miles and round to 2 decimal places
+    //         ];
+    //     });
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'properties' => $formattedProperties,
+    //         'total' => $properties->count(),
+    //     ]);
+    // }
+
+    /**
+     * Get nearby properties using local database with response format matching Bridge API
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function getNearbyProperties(Request $request)
     {
         // Validate request parameters
@@ -2558,13 +2663,11 @@ class PropertyController extends Controller
         $limit = $request->input('limit', 12); // Default 12 properties
 
         // Convert miles to degrees (approximate conversion)
-        // 1 degree of latitude is approximately 69 miles
-        // 1 degree of longitude varies based on latitude, but we'll use a simplified approach
         $latRadius = $radius / 69;
         $longRadius = $radius / (69 * cos(deg2rad($latitude)));
 
         // Query properties within the radius
-        $query = BridgeProperty::with(['media'])
+        $query = BridgeProperty::with(['media', 'details'])
             ->whereBetween('latitude', [$latitude - $latRadius, $latitude + $latRadius])
             ->whereBetween('longitude', [$longitude - $longRadius, $longitude + $longRadius]);
 
@@ -2581,8 +2684,7 @@ class PropertyController extends Controller
             $query->where('list_price', '<=', $request->input('max_price'));
         }
 
-        // Calculate distance and add it to the query
-        // Using Haversine formula to calculate distance
+        // Calculate distance using Haversine formula
         $haversine = "(
         6371 * acos(
             cos(radians($latitude)) 
@@ -2606,34 +2708,59 @@ class PropertyController extends Controller
         // Apply limit
         $properties = $query->limit($limit)->get();
 
-        // Format the response
+        // Format the response to match Bridge API format
         $formattedProperties = $properties->map(function ($property) {
+            // Convert distance from km to miles
+            $distanceInMiles = round($property->distance * 0.621371, 2);
+
+            // Create a response that matches the Bridge API format
             return [
-                'id' => $property->id,
-                'listing_id' => $property->listing_id,
-                'listing_key' => $property->listing_key,
-                'address' => trim($property->street_number . ' ' . $property->street_name),
-                'unit_number' => $property->unit_number,
-                'city' => $property->city,
-                'state' => $property->state_or_province,
-                'postal_code' => $property->postal_code,
-                'price' => $property->list_price,
-                'bedrooms' => $property->bedrooms_total,
-                'bathrooms' => $property->bathrooms_total_decimal,
-                'living_area' => $property->living_area,
-                'property_type' => $property->property_type,
-                'property_sub_type' => $property->property_sub_type,
-                'year_built' => $property->year_built,
-                'photos' => $property->media->map(function ($media) {
-                    return $media->media_url;
+                // Use the exact field names from Bridge API
+                'ListingId' => $property->listing_id,
+                'ListingKey' => $property->listing_key,
+                'StreetNumber' => $property->street_number,
+                'StreetName' => $property->street_name,
+                'UnitNumber' => $property->unit_number,
+                'City' => $property->city,
+                'StateOrProvince' => $property->state_or_province,
+                'PostalCode' => $property->postal_code,
+                'CountyOrParish' => $property->county_or_parish,
+                'ListPrice' => $property->list_price,
+                'BedroomsTotal' => $property->bedrooms_total,
+                'BathroomsTotalDecimal' => $property->bathrooms_total_decimal,
+                'LivingArea' => $property->living_area,
+                'LivingAreaUnits' => $property->living_area_units,
+                'LotSizeAcres' => $property->lot_size_acres,
+                'PropertyType' => $property->property_type,
+                'PropertySubType' => $property->property_sub_type,
+                'YearBuilt' => $property->year_built,
+                'StandardStatus' => $property->standard_status,
+                'PublicRemarks' => $property->public_remarks,
+                'Latitude' => $property->latitude,
+                'Longitude' => $property->longitude,
+
+                // Include media in the format Bridge API uses
+                'Media' => $property->media->map(function ($media) {
+                    return [
+                        'MediaURL' => $media->media_url,
+                        'MediaType' => $media->media_type,
+                        'Order' => $media->order,
+                        'Description' => $media->description
+                    ];
                 }),
-                'distance' => round($property->distance * 0.621371, 2), // Convert km back to miles and round to 2 decimal places
+
+                // Add the calculated distance
+                'distance' => $distanceInMiles,
+
+                // Include any additional fields that might be needed
+                'id' => $property->id, // Keep your internal ID for reference
             ];
         });
 
+        // Structure the response to match Bridge API format
         return response()->json([
             'success' => true,
-            'properties' => $formattedProperties,
+            'bundle' => $formattedProperties,
             'total' => $properties->count(),
         ]);
     }
