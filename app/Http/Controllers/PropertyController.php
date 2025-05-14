@@ -2391,20 +2391,95 @@ class PropertyController extends Controller
         ]);
     }
 
-    public function getPropertyByListingId($listingId)
-    {
-        $property = BridgeProperty::with(['details', 'media', 'features'])->where('listing_id', $listingId)->first();
-
-        if (!$property) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Property not found with the provided listing ID'
-            ], 404);
-        }
-
-        // Format the property data using the existing method
-        return $this->formatPropertyResponse($property);
+    /**
+     * Get property by listing ID with custom formatting
+     * 
+     * @param string $listingId The listing ID to retrieve
+     * @return \Illuminate\Http\JsonResponse
+     */
+/**
+ * Get property by listing ID with custom formatting
+ * 
+ * @param string $listingId The listing ID to retrieve
+ * @return \Illuminate\Http\JsonResponse
+ */
+public function getPropertyByListingId($listingId)
+{
+    $property = BridgeProperty::with(['details', 'media', 'features'])->where('listing_id', $listingId)->first();
+    
+    if (!$property) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Property not found with the provided listing ID'
+        ], 404);
     }
+    
+    // Format the property data in the requested format
+    $formattedProperty = [
+        'id' => $property->id,
+        'status' => $property->mls_status,
+        'MlsStatus' => $property->listing_id,
+        'DaysOnMarket' => $property->days_on_market,
+        'Taxs' => $property->tax_annual_amount,
+        'HOA' => $property->association_fee,
+        'PropertyType' => $property->property_sub_type,
+        'YearBuilt' => $property->year_built,
+        'LotSize' => $property->lot_size_square_feet . ' ' . $property->lot_size_units,
+        'County' => $property->county_or_parish,
+        'listing_id' => $property->listing_id,
+        'listing_key' => $property->listing_key,
+        'address' => trim($property->street_number . ' ' . $property->street_name),
+        'unit_number' => $property->unit_number,
+        'city' => $property->city,
+        'state' => $property->state_or_province,
+        'postal_code' => $property->postal_code,
+        'price' => $property->list_price,
+        'bedrooms' => $property->bedrooms_total,
+        'bathrooms' => $property->bathrooms_total_decimal,
+        'status' => $property->standard_status,
+        'photos' => $property->media->map(function ($media) {
+            return $media->media_url;
+        }),
+        
+        'Property_details' => [
+            'Subdivision' => $property->details->subdivision_name ?? null,
+            'Style' => $property->details->miamire_style ?? null,
+            'WaterFront' => $property->waterfront_yn ?? null,
+            'View' => $property->details->view ?? null,
+            'Furnished' => $property->furnished ?? null,
+            'Area' => $property->details->miamire_area ?? null,
+            'Sqft Total' => $property->details->building_area_total ?? null,
+            'Sqft LivArea' => $property->living_area ?? null,
+            'AdjustedAreaSF' => $property->details->miamire_adjusted_area_sf ?? null,
+            'YearBuilt Description' => $property->year_built_details ?? null
+        ],
+        
+        'Building_Information' => [
+            'Stories' => $property->stories_total ?? null,
+            'YearBuilt' => $property->year_built ?? null,
+            'Lot Size' => $property->lot_size_square_feet . ' ' . $property->lot_size_units
+        ],
+        
+        'Property_Information' => [
+            'Parcel Number' => $property->parcel_number ?? null,
+            'Parcel Number MLX' => $property->parcel_number ? substr($property->parcel_number, -4) : null,
+            'MlsArea' => $property->details->public_survey_township ?? null,
+            'TownshipRange' => $property->details->public_survey_range ?? null,
+            'Section' => $property->details->public_survey_section ?? null,
+            'Subdivision Complex Bldg' => $property->details->subdivision_name ?? null,
+            'Zoning Information' => $property->details->zoning ?? null
+        ],
+        
+        'features' => $property->features->pluck('name')
+    ];
+    
+    return response()->json([
+        'success' => true,
+        'property' => $formattedProperty
+    ]);
+}
+
+
 
     /**
      * Get nearby properties using Bridge API
