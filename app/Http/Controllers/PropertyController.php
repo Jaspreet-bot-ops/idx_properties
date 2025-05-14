@@ -2668,7 +2668,7 @@ class PropertyController extends Controller
                 'Tax Information' => $property->details->tax_legal_description ?? null
             ],
 
-            'Room Information' => [
+            'Room_Information' => [
                 'Room Description' => '-',
                 'Bedroom Description' => '-',
                 'Master Bathroom Description:' => '-',
