@@ -2465,7 +2465,6 @@ class PropertyController extends Controller
             'limit' => 15,
             'near' => "{$longitude},{$latitude}",
             'radius' => "{$radius}mi",
-            'sortBy' => 'distance',
         ];
 
         try {
