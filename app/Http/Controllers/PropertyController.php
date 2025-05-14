@@ -70,344 +70,61 @@ class PropertyController extends Controller
     protected function getStateAbbreviation($state)
     {
         $states = [
-            'Alabama' => 'AL', 'Alaska' => 'AK', 'Arizona' => 'AZ', 'Arkansas' => 'AR',
-            'California' => 'CA', 'Colorado' => 'CO', 'Connecticut' => 'CT', 'Delaware' => 'DE',
-            'Florida' => 'FL', 'Georgia' => 'GA', 'Hawaii' => 'HI', 'Idaho' => 'ID',
-            'Illinois' => 'IL', 'Indiana' => 'IN', 'Iowa' => 'IA', 'Kansas' => 'KS',
-            'Kentucky' => 'KY', 'Louisiana' => 'LA', 'Maine' => 'ME', 'Maryland' => 'MD',
-            'Massachusetts' => 'MA', 'Michigan' => 'MI', 'Minnesota' => 'MN', 'Mississippi' => 'MS',
-            'Missouri' => 'MO', 'Montana' => 'MT', 'Nebraska' => 'NE', 'Nevada' => 'NV',
-            'New Hampshire' => 'NH', 'New Jersey' => 'NJ', 'New Mexico' => 'NM', 'New York' => 'NY',
-            'North Carolina' => 'NC', 'North Dakota' => 'ND', 'Ohio' => 'OH', 'Oklahoma' => 'OK',
-            'Oregon' => 'OR', 'Pennsylvania' => 'PA', 'Rhode Island' => 'RI', 'South Carolina' => 'SC',
-            'South Dakota' => 'SD', 'Tennessee' => 'TN', 'Texas' => 'TX', 'Utah' => 'UT',
-            'Vermont' => 'VT', 'Virginia' => 'VA', 'Washington' => 'WA', 'West Virginia' => 'WV',
-            'Wisconsin' => 'WI', 'Wyoming' => 'WY',
+            'Alabama' => 'AL',
+            'Alaska' => 'AK',
+            'Arizona' => 'AZ',
+            'Arkansas' => 'AR',
+            'California' => 'CA',
+            'Colorado' => 'CO',
+            'Connecticut' => 'CT',
+            'Delaware' => 'DE',
+            'Florida' => 'FL',
+            'Georgia' => 'GA',
+            'Hawaii' => 'HI',
+            'Idaho' => 'ID',
+            'Illinois' => 'IL',
+            'Indiana' => 'IN',
+            'Iowa' => 'IA',
+            'Kansas' => 'KS',
+            'Kentucky' => 'KY',
+            'Louisiana' => 'LA',
+            'Maine' => 'ME',
+            'Maryland' => 'MD',
+            'Massachusetts' => 'MA',
+            'Michigan' => 'MI',
+            'Minnesota' => 'MN',
+            'Mississippi' => 'MS',
+            'Missouri' => 'MO',
+            'Montana' => 'MT',
+            'Nebraska' => 'NE',
+            'Nevada' => 'NV',
+            'New Hampshire' => 'NH',
+            'New Jersey' => 'NJ',
+            'New Mexico' => 'NM',
+            'New York' => 'NY',
+            'North Carolina' => 'NC',
+            'North Dakota' => 'ND',
+            'Ohio' => 'OH',
+            'Oklahoma' => 'OK',
+            'Oregon' => 'OR',
+            'Pennsylvania' => 'PA',
+            'Rhode Island' => 'RI',
+            'South Carolina' => 'SC',
+            'South Dakota' => 'SD',
+            'Tennessee' => 'TN',
+            'Texas' => 'TX',
+            'Utah' => 'UT',
+            'Vermont' => 'VT',
+            'Virginia' => 'VA',
+            'Washington' => 'WA',
+            'West Virginia' => 'WV',
+            'Wisconsin' => 'WI',
+            'Wyoming' => 'WY',
         ];
 
         $state = trim($state);
         return $states[$state] ?? $state;
     }
-
-    // public function index(Request $request)
-    // {
-    //     $query = Property::query();
-
-    //     // Search functionality
-    //     if ($request->has('search') && !empty($request->search)) {
-    //         $searchTerm = trim($request->search);
-
-    //         $parts = array_map('trim', explode(',', $searchTerm));
-    //         $partsCount = count($parts);
-
-    //         $street = null;
-    //         $city = null;
-    //         $state = null;
-    //         $postalCode = null;
-    //         $country = null;
-
-    //         // Handle different address input patterns
-    //         if ($partsCount >= 1) {
-    //             $streetOrCity = $parts[0];
-
-    //             // If it's a full address, like "400 Sunny Isles Blvd 119"
-    //             if (preg_match('/\d+/', $streetOrCity)) {
-    //                 $street = $streetOrCity;
-    //             } else {
-    //                 $city = $streetOrCity;
-    //             }
-    //         }
-
-    //         if ($partsCount >= 2) {
-    //             $city = $parts[1];
-    //         }
-
-    //         if ($partsCount >= 3) {
-    //             $state = $parts[2];
-    //         }
-
-    //         if ($partsCount >= 4) {
-    //             // Either a postal code or a country
-    //             if (preg_match('/\d{4,}/', $parts[3])) {
-    //                 $postalCode = $parts[3];
-    //             } else {
-    //                 $country = $parts[3];
-    //             }
-    //         }
-
-    //         if ($partsCount >= 5) {
-    //             $country = $parts[4];
-    //         }
-
-    //         // Convert full state to abbreviation if needed
-    //         $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
-
-    //         $query->where(function ($q) use ($street, $city, $stateAbbr, $postalCode, $country) {
-    //             if ($street) {
-    //                 $q->where(DB::raw("CONCAT(StreetNumber, ' ', StreetName)"), 'like', "%{$street}%")
-    //                     ->orWhere('UnparsedAddress', 'like', "%{$street}%");
-    //             }
-
-    //             if ($city) {
-    //                 $q->where('City', 'like', "%{$city}%");
-    //             }
-
-    //             if ($stateAbbr) {
-    //                 $q->where('StateOrProvince', 'like', "{$stateAbbr}%");
-    //             }
-
-    //             if ($postalCode) {
-    //                 $q->where('PostalCode', 'like', "%{$postalCode}%");
-    //             }
-
-    //             if ($country) {
-    //                 $q->where('country', 'like', "%{$country}%");
-    //             }
-    //         });
-    //     }
-
-    //     // Individual filters (optional)
-    //     if ($request->filled('street_number')) {
-    //         $query->where('StreetNumber', 'like', "%{$request->street_number}%");
-    //     }
-
-    //     if ($request->filled('street_name')) {
-    //         $query->where('StreetName', 'like', "%{$request->street_name}%");
-    //     }
-
-    //     if ($request->filled('postal_code')) {
-    //         $query->where('PostalCode', 'like', "%{$request->postal_code}%");
-    //     }
-
-    //     if ($request->filled('city')) {
-    //         $query->where('City', 'like', "%{$request->city}%");
-    //     }
-
-    //     if ($request->filled('country')) {
-    //         $query->where('country', 'like', "%{$request->country}%");
-    //     }
-
-    //     $sortBy = $request->get('sort_by', 'PropertyType'); // Default sort by 'PropertyType'
-    //     $sortDirection = $request->get('sort_direction', 'asc'); // Default sort direction is 'asc'
-
-    //     $query->orderBy($sortBy, $sortDirection);
-
-    //     $properties = $query->paginate(10);
-
-    //     if ($request->ajax()) {
-    //         return response()->json([
-    //             'html' => view('partials.properties-table', compact('properties'))->render(),
-    //             'pagination' => view('partials.pagination', compact('properties'))->render(),
-    //         ]);
-    //     }
-
-    //     return view('properties', compact('properties'));
-    // }
-
-    // public function index(Request $request)
-    // {
-    //     $query = BridgeProperty::query();
-
-    //     // Search functionality
-    //     if ($request->has('search') && !empty($request->search)) {
-    //         $searchTerm = trim($request->search);
-
-    //         $parts = array_map('trim', explode(',', $searchTerm));
-    //         $partsCount = count($parts);
-
-    //         $street = null;
-    //         $city = null;
-    //         $state = null;
-    //         $postalCode = null;
-    //         $country = null;
-
-    //         // Handle different address input patterns
-    //         if ($partsCount >= 1) {
-    //             $streetOrCity = $parts[0];
-
-    //             // If it's a full address, like "400 Sunny Isles Blvd 119"
-    //             if (preg_match('/\d+/', $streetOrCity)) {
-    //                 $street = $streetOrCity;
-    //             } else {
-    //                 $city = $streetOrCity;
-    //             }
-    //         }
-
-    //         if ($partsCount >= 2) {
-    //             $city = $parts[1];
-    //         }
-
-    //         if ($partsCount >= 3) {
-    //             $state = $parts[2];
-    //         }
-
-    //         if ($partsCount >= 4) {
-    //             // Either a postal code or a country
-    //             if (preg_match('/\d{4,}/', $parts[3])) {
-    //                 $postalCode = $parts[3];
-    //             } else {
-    //                 $country = $parts[3];
-    //             }
-    //         }
-
-    //         if ($partsCount >= 5) {
-    //             $country = $parts[4];
-    //         }
-
-    //         // Convert full state to abbreviation if needed
-    //         $stateAbbr = $state ? $this->getStateAbbreviation($state) : null;
-
-    //         $query->where(function ($q) use ($street, $city, $stateAbbr, $postalCode, $country) {
-    //             if ($street) {
-    //                 $q->where(DB::raw("CONCAT(street_number, ' ', street_name)"), 'like', "%{$street}%")
-    //                     ->orWhere('unparsed_address', 'like', "%{$street}%");
-    //             }
-
-    //             if ($city) {
-    //                 $q->where('city', 'like', "%{$city}%");
-    //             }
-
-    //             if ($stateAbbr) {
-    //                 $q->where('state_or_province', 'like', "{$stateAbbr}%");
-    //             }
-
-    //             if ($postalCode) {
-    //                 $q->where('postal_code', 'like', "%{$postalCode}%");
-    //             }
-
-    //             if ($country) {
-    //                 $q->where('country', 'like', "%{$country}%");
-    //             }
-    //         });
-    //     }
-
-    //     // Individual filters (optional)
-    //     if ($request->filled('street_number')) {
-    //         $query->where('street_number', 'like', "%{$request->street_number}%");
-    //     }
-
-    //     if ($request->filled('street_name')) {
-    //         $query->where('street_name', 'like', "%{$request->street_name}%");
-    //     }
-
-    //     if ($request->filled('postal_code')) {
-    //         $query->where('postal_code', 'like', "%{$request->postal_code}%");
-    //     }
-
-    //     if ($request->filled('city')) {
-    //         $query->where('city', 'like', "%{$request->city}%");
-    //     }
-
-    //     if ($request->filled('country')) {
-    //         $query->where('country', 'like', "%{$request->country}%");
-    //     }
-
-    //     $sortBy = $request->get('sort_by', 'property_type'); // Default sort by 'property_type'
-    //     $sortDirection = $request->get('sort_direction', 'asc'); // Default sort direction is 'asc'
-
-    //     $query->orderBy($sortBy, $sortDirection);
-
-    //     $properties = $query->paginate(10);
-
-    //     if ($request->ajax()) {
-    //         return response()->json([
-    //             'html' => view('partials.properties-table', compact('properties'))->render(),
-    //             'pagination' => view('partials.pagination', compact('properties'))->render(),
-    //         ]);
-    //     }
-
-    //     return view('properties', compact('properties'));
-    // }
-
-    // public function index(Request $request)
-    // {
-    //     $search = $request->input('search');
-    //     $sortBy = $request->input('sort_by', 'id');
-    //     $sortDirection = $request->input('sort_direction', 'desc');
-
-    //     $query = BridgeProperty::query();
-
-    //     // Apply search filter if provided
-    //     if ($search) {
-    //         // Check if this is a property_id search
-    //         if (preg_match('/property_id:(\d+)/', $search, $matches)) {
-    //             // If we have a property ID, just search for that specific property
-    //             $propertyId = $matches[1];
-    //             $query->where('id', $propertyId);
-    //         }
-    //         // Check if this is a street search
-    //         else if (preg_match('/street:(.+)/', $search, $matches)) {
-    //             $streetInfo = trim($matches[1]);
-
-    //             // Try to extract street number and name
-    //             if (preg_match('/^(\d+)\s+(.+)$/', $streetInfo, $streetMatches)) {
-    //                 $streetNumber = $streetMatches[1];
-    //                 $streetName = trim($streetMatches[2]);
-
-    //                 // Search for properties with this street number and name
-    //                 $query->where('street_number', $streetNumber)
-    //                       ->where('street_name', 'like', $streetName . '%');
-    //             } else {
-    //                 // If we couldn't parse it, just search the street name
-    //                 $query->where('street_name', 'like', '%' . $streetInfo . '%');
-    //             }
-    //         }
-    //         // Check if this is a city search
-    //         else if (preg_match('/^([^,]+),\s*([A-Z]{2})$/', $search, $matches)) {
-    //             $city = trim($matches[1]);
-    //             $state = $matches[2];
-    //             $query->where('city', $city)
-    //                   ->where('state_or_province', $state);
-    //         }
-    //         // Check if this is a state search
-    //         else if (preg_match('/^([A-Z]{2})$/', $search, $matches)) {
-    //             $state = $matches[1];
-    //             $query->where('state_or_province', $state);
-    //         }
-    //         // Check if this is a postal code search
-    //         else if (preg_match('/^(\d{5}),\s*([A-Z]{2})$/', $search, $matches)) {
-    //             $postalCode = $matches[1];
-    //             $state = $matches[2];
-    //             $query->where('postal_code', $postalCode)
-    //                   ->where('state_or_province', $state);
-    //         }
-    //         // Check if this might be a street number and name without our prefix
-    //         else if (preg_match('/^(\d+)\s+(.+)$/', $search, $streetMatches)) {
-    //             $streetNumber = $streetMatches[1];
-    //             $streetName = trim($streetMatches[2]);
-
-    //             // If it looks like a street address (number followed by text)
-    //             $query->where(function($q) use ($streetNumber, $streetName, $search) {
-    //                 // Try exact match on street number and name
-    //                 $q->where(function($sq) use ($streetNumber, $streetName) {
-    //                     $sq->where('street_number', $streetNumber)
-    //                        ->where('street_name', 'like', $streetName . '%');
-    //                 })
-    //                 // Or try matching the full unparsed address
-    //                 ->orWhere('unparsed_address', 'like', '%' . $search . '%');
-    //             });
-    //         }
-    //         // General search
-    //         else {
-    //             $query->where(function($q) use ($search) {
-    //                 $q->where('unparsed_address', 'like', "%{$search}%")
-    //                   ->orWhere('street_number', 'like', "%{$search}%")
-    //                   ->orWhere('street_name', 'like', "%{$search}%")
-    //                   ->orWhere('city', 'like', "%{$search}%")
-    //                   ->orWhere('state_or_province', 'like', "%{$search}%")
-    //                   ->orWhere('postal_code', 'like', "%{$search}%");
-    //             });
-    //         }
-    //     }
-
-    //     // Apply sorting
-    //     $query->orderBy($sortBy, $sortDirection);
-
-    //     // Get paginated results
-    //     $properties = $query->paginate(15)->withQueryString();
-
-    //     return view('properties', compact('properties'));
-    // }     
 
     public function index(Request $request)
     {
@@ -2670,6 +2387,254 @@ class PropertyController extends Controller
                 'to' => min($request->input('page', 1) * $request->input('limit', 12), $totalCount),
                 'has_more_pages' => ($request->input('page', 1) * $request->input('limit', 12)) < $totalCount,
             ],
+        ]);
+    }
+
+    public function getPropertyByListingId($listingId)
+    {
+        $property = BridgeProperty::with([
+            'details',
+            'media',
+            'features',
+            'booleanFeatures',
+            'taxInformation',
+            'financialDetails',
+            'leaseInformation',
+            'listAgent',
+            'coListAgent',
+            'buyerAgent',
+            'coBuyerAgent',
+            'listOffice',
+            'coListOffice',
+            'buyerOffice',
+            'coBuyerOffice',
+            'schools',
+            'elementarySchool',
+            'middleSchool',
+            'highSchool'
+        ])->where('listing_id', $listingId)->first();
+
+        if (!$property) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Property not found with the provided listing ID'
+            ], 404);
+        }
+
+        // Format the property data using the existing method
+        return $this->formatPropertyResponse($property);
+    }
+
+    /**
+     * Get nearby properties using Bridge API
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    // public function getNearbyProperties(Request $request)
+    // {
+    //     // Validate request parameters
+    //     $request->validate([
+    //         'latitude' => 'required|numeric',
+    //         'longitude' => 'required|numeric',
+    //         'radius' => 'nullable|numeric|min:0.1|max:50',
+    //         'limit' => 'nullable|integer|min:1|max:50',
+    //         'property_type' => 'nullable|string',
+    //         'min_price' => 'nullable|numeric',
+    //         'max_price' => 'nullable|numeric',
+    //     ]);
+
+    //     $latitude = $request->input('latitude');
+    //     $longitude = $request->input('longitude');
+    //     $radius = $request->input('radius', 5); // Default 5 miles
+    //     $limit = $request->input('limit', 10); // Default 10 properties
+
+    //     // Get access token from config
+    //     $accessToken = config('services.trestle.access_token');
+    //     $datasetId = config('services.trestle.dataset_id');
+
+    //     // If we don't have a stored token, try to get one
+
+    //     // Build the API URL
+    //     $apiUrl = "https://api.bridgedataoutput.com/api/v2/{$datasetId}/listings";
+
+    //     // Build query parameters
+    //     $queryParams = [
+    //         'access_token' => 'f091fc0d25a293957350aa6a022ea4fb',
+    //         'limit' => 12,
+    //         'near' => "{$longitude},{$latitude}",
+    //         'radius' => "{$radius}mi",
+    //         'sortBy' => 'distance',
+    //     ];
+
+    //     // Add optional filters
+    //     if ($request->filled('property_type')) {
+    //         $queryParams['PropertyType'] = $request->input('property_type');
+    //     }
+
+    //     if ($request->filled('min_price')) {
+    //         $queryParams['ListPrice.gte'] = $request->input('min_price');
+    //     }
+
+    //     if ($request->filled('max_price')) {
+    //         $queryParams['ListPrice.lte'] = $request->input('max_price');
+    //     }
+
+    //     try {
+    //         // Make the API request
+    //         $response = Http::get($apiUrl, $queryParams);
+
+    //         // Check if the request was successful
+    //         if (!$response->successful()) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Error fetching nearby properties',
+    //                 'error' => $response->body()
+    //             ], $response->status());
+    //         }
+
+    //         $data = $response->json();
+
+    //         // Format the response
+    //         $properties = collect($data['bundle'] ?? []);
+
+    //         $formattedProperties = $properties->map(function ($property) {
+    //             return [
+    //                 'listing_id' => $property['ListingId'] ?? null,
+    //                 'listing_key' => $property['ListingKey'] ?? null,
+    //                 'address' => trim(($property['StreetNumber'] ?? '') . ' ' . ($property['StreetName'] ?? '')),
+    //                 'unit_number' => $property['UnitNumber'] ?? null,
+    //                 'city' => $property['City'] ?? null,
+    //                 'state' => $property['StateOrProvince'] ?? null,
+    //                 'postal_code' => $property['PostalCode'] ?? null,
+    //                 'price' => $property['ListPrice'] ?? null,
+    //                 'bedrooms' => $property['BedroomsTotal'] ?? null,
+    //                 'bathrooms' => $property['BathroomsTotalDecimal'] ?? null,
+    //                 'living_area' => $property['LivingArea'] ?? null,
+    //                 'property_type' => $property['PropertyType'] ?? null,
+    //                 'property_sub_type' => $property['PropertySubType'] ?? null,
+    //                 'year_built' => $property['YearBuilt'] ?? null,
+    //                 'photos' => collect($property['Media'] ?? [])->pluck('MediaURL'),
+    //                 'distance' => $property['distance'] ?? null,
+    //             ];
+    //         });
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'properties' => $formattedProperties,
+    //             'total' => $data['total'] ?? count($formattedProperties),
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Error fetching nearby properties',
+    //             'error' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
+
+    /**
+     * Get nearby properties using local database
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getNearbyProperties(Request $request)
+    {
+        // Validate request parameters
+        $request->validate([
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'radius' => 'nullable|numeric|min:0.1|max:50',
+            'limit' => 'nullable|integer|min:1|max:50',
+            'property_type' => 'nullable|string',
+            'min_price' => 'nullable|numeric',
+            'max_price' => 'nullable|numeric',
+        ]);
+
+        $latitude = $request->input('latitude');
+        $longitude = $request->input('longitude');
+        $radius = $request->input('radius', 5); // Default 5 miles
+        $limit = $request->input('limit', 12); // Default 12 properties
+
+        // Convert miles to degrees (approximate conversion)
+        // 1 degree of latitude is approximately 69 miles
+        // 1 degree of longitude varies based on latitude, but we'll use a simplified approach
+        $latRadius = $radius / 69;
+        $longRadius = $radius / (69 * cos(deg2rad($latitude)));
+
+        // Query properties within the radius
+        $query = BridgeProperty::with(['media'])
+            ->whereBetween('latitude', [$latitude - $latRadius, $latitude + $latRadius])
+            ->whereBetween('longitude', [$longitude - $longRadius, $longitude + $longRadius]);
+
+        // Add optional filters
+        if ($request->filled('property_type')) {
+            $query->where('property_type', $request->input('property_type'));
+        }
+
+        if ($request->filled('min_price')) {
+            $query->where('list_price', '>=', $request->input('min_price'));
+        }
+
+        if ($request->filled('max_price')) {
+            $query->where('list_price', '<=', $request->input('max_price'));
+        }
+
+        // Calculate distance and add it to the query
+        // Using Haversine formula to calculate distance
+        $haversine = "(
+        6371 * acos(
+            cos(radians($latitude)) 
+            * cos(radians(latitude)) 
+            * cos(radians(longitude) - radians($longitude)) 
+            + sin(radians($latitude)) 
+            * sin(radians(latitude))
+        )
+    )";
+
+        // Add the distance calculation to the query
+        $query->selectRaw("*, $haversine AS distance");
+
+        // Filter by distance (convert miles to km - 1 mile = 1.60934 km)
+        $radiusKm = $radius * 1.60934;
+        $query->whereRaw("$haversine < ?", [$radiusKm]);
+
+        // Order by distance
+        $query->orderBy('distance', 'asc');
+
+        // Apply limit
+        $properties = $query->limit($limit)->get();
+
+        // Format the response
+        $formattedProperties = $properties->map(function ($property) {
+            return [
+                'id' => $property->id,
+                'listing_id' => $property->listing_id,
+                'listing_key' => $property->listing_key,
+                'address' => trim($property->street_number . ' ' . $property->street_name),
+                'unit_number' => $property->unit_number,
+                'city' => $property->city,
+                'state' => $property->state_or_province,
+                'postal_code' => $property->postal_code,
+                'price' => $property->list_price,
+                'bedrooms' => $property->bedrooms_total,
+                'bathrooms' => $property->bathrooms_total_decimal,
+                'living_area' => $property->living_area,
+                'property_type' => $property->property_type,
+                'property_sub_type' => $property->property_sub_type,
+                'year_built' => $property->year_built,
+                'photos' => $property->media->map(function ($media) {
+                    return $media->media_url;
+                }),
+                'distance' => round($property->distance * 0.621371, 2), // Convert km back to miles and round to 2 decimal places
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'properties' => $formattedProperties,
+            'total' => $properties->count(),
         ]);
     }
 }

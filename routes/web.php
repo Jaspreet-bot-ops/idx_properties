@@ -66,6 +66,8 @@ Route::get('/api/wp1/properties', [PropertyController::class, 'getProperties']);
 // In your routes file (web.php or api.php)
 Route::get('/wp1/map-properties/bounds', [PropertyController::class, 'getPropertiesInBounds']);
 
+// Get nearby properties from local database
+Route::get('/api/wpi/properties/nearby', [PropertyController::class, 'getNearbyProperties']);
 
 
 require __DIR__.'/auth.php';
