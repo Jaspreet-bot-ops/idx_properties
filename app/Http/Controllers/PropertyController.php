@@ -2521,7 +2521,8 @@ class PropertyController extends Controller
             'details',
             'media',
             'features.category', // Include the category relationship
-            'booleanFeatures'
+            'booleanFeatures',
+            'taxInformation',
         ])->where('listing_id', $listingId)->first();
 
         if (!$property) {
@@ -2545,6 +2546,20 @@ class PropertyController extends Controller
             return !empty($features) ? implode(', ', $features) : null;
         };
 
+            $jsonToCommaString = function($jsonString) {
+        if (empty($jsonString)) return null;
+        
+        try {
+            $array = json_decode($jsonString, true);
+            if (is_array($array) && !empty($array)) {
+                return implode(', ', $array);
+            }
+            return $jsonString; // Return original if not a valid JSON array
+        } catch (\Exception $e) {
+            return $jsonString; // Return original on error
+        }
+    };
+
         // Get specific feature categories
         $heatingFeatures = $getFeaturesByCategory('Heating');
         $coolingFeatures = $getFeaturesByCategory('Cooling');
@@ -2562,7 +2577,9 @@ class PropertyController extends Controller
         $constructionMaterials = $getFeaturesByCategory('Construction Materials');
         $flooringFeatures = $getFeaturesByCategory('Flooring');
         $communityFeatures = $getFeaturesByCategory('Community Features');
-
+    $guestHouseDescription = $jsonToCommaString($property->details->miamire_guest_house_description ?? null);
+    $typeOfAssociation = $jsonToCommaString($property->details->miamire_type_of_association ?? null);
+    $subdivisionInformation = $jsonToCommaString($property->details->miamire_subdivision_information ?? null);
         // Format the property data in the requested format
         $formattedProperty = [
             'id' => $property->id,
@@ -2614,9 +2631,9 @@ class PropertyController extends Controller
                 'Parcel Number' => $property->parcel_number ?? null,
                 'Parcel Number MLX' => $property->parcel_number ? substr($property->parcel_number, -4) : null,
                 'MlsArea' => $property->details->public_survey_township ?? null,
-                'TownshipRange' => $property->details->public_survey_range ?? null,
-                'Section' => $property->details->public_survey_section ?? null,
-                'Subdivision Complex Bldg' => $property->details->subdivision_name ?? null,
+                'TownshipRange' => $property->taxInformation->public_survey_range ?? null,
+                'Section' => $property->taxInformation->public_survey_section ?? null,
+                'Subdivision Complex Bldg' => $property->taxInformation->subdivision_name ?? null,
                 'Zoning Information' => $property->details->zoning ?? null
             ],
 
@@ -2641,7 +2658,7 @@ class PropertyController extends Controller
             ],
 
             'Financial_Information' => [
-                'Type of Association' => $property->details->miamire_type_of_association ?? null,
+                'Type of Association' => $typeOfAssociation,
                 'Assoc fee paid per' => $property->association_fee_frequency ?? null,
                 'Tax Year' => $property->tax_year ?? null,
                 'Tax Information' => $property->details->tax_legal_description ?? null
@@ -2653,13 +2670,13 @@ class PropertyController extends Controller
                 'Water Description' => $waterFeatures,
                 'Sewer Description' => $sewerFeatures,
                 'Pets Allowed' => $property->details->miamire_pets_allowed_yn ?? null,
-                'Guest House Description' => $property->details->miamire_guest_house_description ?? null,
+                'Guest House Description' => $guestHouseDescription,
                 'Furnished' => $property->furnished ?? null,
                 'Interior Features' => $interiorFeatures,
                 'Equipment Appliances' => $applianceFeatures,
                 'Window Treatment' => $windowFeatures,
                 'Exterior Features' => $exteriorFeatures,
-                'Subdivision Information' => $communityFeatures
+                'Subdivision Information' => $subdivisionInformation
             ],
         ];
 
