@@ -1961,232 +1961,45 @@ class PropertyController extends Controller
     }
 
 
-    /**
-     * Format response for building properties list
-     */
-    private function formatBuildingResponse($properties, Request $request, $totalCount)
-    {
-        // Prepare building details from the first property
-        $buildingDetails = null;
-        $representativeProperty = $properties->first();
-        if ($representativeProperty && $representativeProperty->details) {
-            $buildingDetails = [
-                'building_name' => $representativeProperty->details->building_name ?? null,
-                'year_built' => $representativeProperty->year_built,
-                'address' => trim($request->input('street_number') . ' ' . $request->input('street_name')),
-                // 'city' => $representativeProperty->city,
-                'state' => $representativeProperty->state_or_province,
-                'postal_code' => $representativeProperty->postal_code,
-                'total_units' => $totalCount,
-                'property_sub_type' => $representativeProperty->property_sub_type,
-                // Add other building details as needed
-            ];
-        }
-
-        // Format properties list
-        $formattedProperties = $properties->map(function ($property) {
-            // Fetch media for each property
-            $mediaUrls = $property->media->map(function ($media) {
-                return $media->media_url;
-            });
-            return [
-                'id' => $property->id,
-                'listing_key' => $property->listing_key,
-                'unit_number' => $property->unit_number,
-                'price' => $property->list_price,
-                'bedrooms' => $property->bedrooms_total,
-                'bathrooms' => $property->bathrooms_total_decimal,
-                'living_area' => $property->living_area,
-                'status' => $property->standard_status,
-                'photos' => $mediaUrls,
-                // Add other property details as needed
-            ];
-        });
-
-        return response()->json([
-            'success' => true,
-            'building' => $buildingDetails,
-            'properties' => $formattedProperties,
-            'total_properties' => $totalCount,
-            'meta' => [
-                'current_page' => (int) $request->input('page', 1),
-                'per_page' => (int) $request->input('limit', 12),
-                'total' => $totalCount,
-                'last_page' => ceil($totalCount / ($request->input('limit', 12))),
-                'from' => (($request->input('page', 1)) - 1) * $request->input('limit', 12) + 1,
-                'to' => min($request->input('page', 1) * $request->input('limit', 12), $totalCount),
-                'has_more_pages' => ($request->input('page', 1) * $request->input('limit', 12)) < $totalCount,
-            ],
-            // Additional info or filters can be added here
-        ]);
-    }
-
+    // /**
+    //  * Format response for building properties list
+    //  */
     // private function formatBuildingResponse($properties, Request $request, $totalCount)
     // {
-    //     // Prepare comprehensive building details from the first property
+    //     // Prepare building details from the first property
     //     $buildingDetails = null;
     //     $representativeProperty = $properties->first();
-
     //     if ($representativeProperty && $representativeProperty->details) {
-    //         // Load additional relationships for the representative property
-    //         $representativeProperty->load(['details', 'features', 'booleanFeatures']);
-
     //         $buildingDetails = [
-    //             // Basic building information
     //             'building_name' => $representativeProperty->details->building_name ?? null,
     //             'year_built' => $representativeProperty->year_built,
     //             'address' => trim($request->input('street_number') . ' ' . $request->input('street_name')),
-    //             'city' => $representativeProperty->city,
-    //             'state_or_province' => $representativeProperty->state_or_province,
+    //             // 'city' => $representativeProperty->city,
+    //             'state' => $representativeProperty->state_or_province,
     //             'postal_code' => $representativeProperty->postal_code,
-    //             'county_or_parish' => $representativeProperty->county_or_parish,
-    //             'country' => $representativeProperty->country,
     //             'total_units' => $totalCount,
-
-    //             // Property classification
-    //             'property_type' => $representativeProperty->property_type,
     //             'property_sub_type' => $representativeProperty->property_sub_type,
-
-    //             // Geographic coordinates
-    //             'latitude' => $representativeProperty->latitude,
-    //             'longitude' => $representativeProperty->longitude,
-
-    //             // Building specifications
-    //             'stories_total' => $representativeProperty->stories_total,
-    //             'new_construction_yn' => $representativeProperty->new_construction_yn,
-
-    //             // Building amenities (from details)
-    //             'structure_type' => $representativeProperty->details->StructureType ?? null,
-    //             'architectural_style' => $representativeProperty->details->ArchitecturalStyle ?? null,
-    //             'heating' => $representativeProperty->details->Heating ?? null,
-    //             'cooling' => $representativeProperty->details->Cooling ?? null,
-    //             'water_source' => $representativeProperty->details->WaterSource ?? null,
-
-    //             // Building features
-    //             'features' => $representativeProperty->features->map(function ($feature) {
-    //                 return [
-    //                     'name' => $feature->name,
-    //                     'category' => $feature->category ? $feature->category->name : null
-    //                 ];
-    //             }),
-
-    //             // Association information
-    //             'association_fee' => $representativeProperty->association_fee,
-    //             'association_fee_frequency' => $representativeProperty->association_fee_frequency,
-
-    //             // Building flags
-    //             'waterfront_yn' => $representativeProperty->waterfront_yn,
-    //             'view_yn' => $representativeProperty->view_yn,
-    //             'pool_private_yn' => $representativeProperty->pool_private_yn,
-    //             'spa_yn' => $representativeProperty->spa_yn,
-
-    //             // Additional building details
-    //             'virtual_tour_url_unbranded' => $representativeProperty->virtual_tour_url_unbranded,
-    //             'public_remarks' => $representativeProperty->public_remarks,
+    //             // Add other building details as needed
     //         ];
-
-    //         // Add school information if available
-    //         if ($representativeProperty->elementarySchool || $representativeProperty->middleSchool || $representativeProperty->highSchool) {
-    //             $buildingDetails['schools'] = [
-    //                 'elementary_school' => $representativeProperty->elementarySchool ? [
-    //                     'name' => $representativeProperty->elementarySchool->name,
-    //                     'district' => $representativeProperty->elementarySchool->district
-    //                 ] : null,
-    //                 'middle_school' => $representativeProperty->middleSchool ? [
-    //                     'name' => $representativeProperty->middleSchool->name,
-    //                     'district' => $representativeProperty->middleSchool->district
-    //                 ] : null,
-    //                 'high_school' => $representativeProperty->highSchool ? [
-    //                     'name' => $representativeProperty->highSchool->name,
-    //                     'district' => $representativeProperty->highSchool->district
-    //                 ] : null
-    //             ];
-    //         }
     //     }
 
-    //     // Format properties list with comprehensive details
+    //     // Format properties list
     //     $formattedProperties = $properties->map(function ($property) {
-    //         // Load media for each property
-    //         $property->load(['media', 'details']);
-
+    //         // Fetch media for each property
+    //         $mediaUrls = $property->media->map(function ($media) {
+    //             return $media->media_url;
+    //         });
     //         return [
-    //             // Basic property information
     //             'id' => $property->id,
     //             'listing_key' => $property->listing_key,
     //             'unit_number' => $property->unit_number,
-
-    //             // Listing details
     //             'price' => $property->list_price,
-    //             'original_list_price' => $property->original_list_price,
-    //             'close_price' => $property->close_price,
-    //             'days_on_market' => $property->days_on_market,
-    //             'status' => $property->standard_status,
-    //             'mls_status' => $property->mls_status,
-    //             'listing_contract_date' => $property->listing_contract_date,
-    //             'on_market_date' => $property->on_market_date,
-    //             'off_market_date' => $property->off_market_date,
-    //             'pending_timestamp' => $property->pending_timestamp,
-    //             'close_date' => $property->close_date,
-    //             'contract_status_change_date' => $property->contract_status_change_date,
-    //             'listing_agreement' => $property->listing_agreement,
-    //             'contingency' => $property->contingency,
-
-    //             // Property specifications
     //             'bedrooms' => $property->bedrooms_total,
     //             'bathrooms' => $property->bathrooms_total_decimal,
-    //             'bathrooms_full' => $property->bathrooms_full,
-    //             'bathrooms_half' => $property->bathrooms_half,
     //             'living_area' => $property->living_area,
-    //             'living_area_units' => $property->living_area_units,
-    //             'year_built' => $property->year_built,
-    //             'year_built_details' => $property->year_built_details,
-
-    //             // Parking information
-    //             'garage_yn' => $property->garage_yn,
-    //             'garage_spaces' => $property->garage_spaces,
-    //             'carport_spaces' => $property->carport_spaces,
-    //             'parking_total' => $property->parking_total,
-
-    //             // Unit features
-    //             'furnished' => $property->furnished,
-    //             'view_yn' => $property->view_yn,
-
-    //             // Financial information
-    //             'association_fee' => $property->association_fee,
-    //             'association_fee_frequency' => $property->association_fee_frequency,
-    //             'tax_annual_amount' => $property->tax_annual_amount,
-    //             'tax_year' => $property->tax_year,
-
-    //             // Unit details
-    //             'floor_number' => $property->details ? $property->details->floor_number : null,
-    //             'pets_allowed' => $property->details ? $property->details->miamire_pets_allowed_yn : null,
-    //             'interior_features' => $property->details ? $property->details->InteriorFeatures : null,
-    //             'appliances' => $property->details ? $property->details->Appliances : null,
-    //             'flooring' => $property->details ? $property->details->Flooring : null,
-
-    //             // Media
-    //             'photos' => $property->media->map(function ($media) {
-    //                 return [
-    //                     'url' => $media->media_url,
-    //                     'type' => $media->media_type,
-    //                     'order' => $media->order,
-    //                     'description' => $media->description
-    //                 ];
-    //             }),
-
-    //             // Timestamps
-    //             'original_entry_timestamp' => $property->original_entry_timestamp,
-    //             'modification_timestamp' => $property->modification_timestamp,
-    //             'price_change_timestamp' => $property->price_change_timestamp,
-    //             'status_change_timestamp' => $property->status_change_timestamp,
-
-    //             // Description
-    //             'public_remarks' => $property->public_remarks,
-    //             'virtual_tour_url_unbranded' => $property->virtual_tour_url_unbranded,
-
-    //             // Agent information (if needed)
-    //             'list_agent_id' => $property->list_agent_id,
-    //             'list_office_id' => $property->list_office_id
+    //             'status' => $property->standard_status,
+    //             'photos' => $mediaUrls,
+    //             // Add other property details as needed
     //         ];
     //     });
 
@@ -2204,26 +2017,214 @@ class PropertyController extends Controller
     //             'to' => min($request->input('page', 1) * $request->input('limit', 12), $totalCount),
     //             'has_more_pages' => ($request->input('page', 1) * $request->input('limit', 12)) < $totalCount,
     //         ],
-    //         'filters' => [
-    //             'street_number' => $request->input('street_number'),
-    //             'street_name' => $request->input('street_name'),
-    //             'building_name' => $request->input('building_name'),
-    //             'city' => $request->input('city'),
-    //             'type' => $request->input('type', 'all'),
-    //             'property_sub_type' => $request->input('property_sub_type'),
-    //             'min_price' => $request->input('min_price'),
-    //             'max_price' => $request->input('max_price'),
-    //             'min_beds' => $request->input('min_beds'),
-    //             'max_beds' => $request->input('max_beds'),
-    //             'min_baths' => $request->input('min_baths'),
-    //             'max_baths' => $request->input('max_baths'),
-    //             'min_living_size' => $request->input('min_living_size'),
-    //             'max_living_size' => $request->input('max_living_size'),
-    //             'sort_by' => $request->input('sort_by', 'list_price'),
-    //             'sort_dir' => $request->input('sort_dir', 'asc')
-    //         ]
+    //         // Additional info or filters can be added here
     //     ]);
     // }
+
+    private function formatBuildingResponse($properties, Request $request, $totalCount)
+    {
+        // Prepare comprehensive building details from the first property
+        $buildingDetails = null;
+        $representativeProperty = $properties->first();
+
+        if ($representativeProperty && $representativeProperty->details) {
+            // Load additional relationships for the representative property
+            $representativeProperty->load(['details', 'features', 'booleanFeatures']);
+
+            $buildingDetails = [
+                // Basic building information
+                'building_name' => $representativeProperty->details->building_name ?? null,
+                'year_built' => $representativeProperty->year_built,
+                'address' => trim($request->input('street_number') . ' ' . $request->input('street_name')),
+                'city' => $representativeProperty->city,
+                'state_or_province' => $representativeProperty->state_or_province,
+                'postal_code' => $representativeProperty->postal_code,
+                'county_or_parish' => $representativeProperty->county_or_parish,
+                'country' => $representativeProperty->country,
+                'total_units' => $totalCount,
+
+                // Property classification
+                'property_type' => $representativeProperty->property_type,
+                'property_sub_type' => $representativeProperty->property_sub_type,
+
+                // Geographic coordinates
+                'latitude' => $representativeProperty->latitude,
+                'longitude' => $representativeProperty->longitude,
+
+                // Building specifications
+                'stories_total' => $representativeProperty->stories_total,
+                'new_construction_yn' => $representativeProperty->new_construction_yn,
+
+                // Building amenities (from details)
+                'structure_type' => $representativeProperty->details->StructureType ?? null,
+                'architectural_style' => $representativeProperty->details->ArchitecturalStyle ?? null,
+                'heating' => $representativeProperty->details->Heating ?? null,
+                'cooling' => $representativeProperty->details->Cooling ?? null,
+                'water_source' => $representativeProperty->details->WaterSource ?? null,
+
+                // Building features
+                'features' => $representativeProperty->features->map(function ($feature) {
+                    return [
+                        'name' => $feature->name,
+                        'category' => $feature->category ? $feature->category->name : null
+                    ];
+                }),
+
+                // Association information
+                'association_fee' => $representativeProperty->association_fee,
+                'association_fee_frequency' => $representativeProperty->association_fee_frequency,
+
+                // Building flags
+                'waterfront_yn' => $representativeProperty->waterfront_yn,
+                'view_yn' => $representativeProperty->view_yn,
+                'pool_private_yn' => $representativeProperty->pool_private_yn,
+                'spa_yn' => $representativeProperty->spa_yn,
+
+                // Additional building details
+                'virtual_tour_url_unbranded' => $representativeProperty->virtual_tour_url_unbranded,
+                'public_remarks' => $representativeProperty->public_remarks,
+            ];
+
+            // Add school information if available
+            if ($representativeProperty->elementarySchool || $representativeProperty->middleSchool || $representativeProperty->highSchool) {
+                $buildingDetails['schools'] = [
+                    'elementary_school' => $representativeProperty->elementarySchool ? [
+                        'name' => $representativeProperty->elementarySchool->name,
+                        'district' => $representativeProperty->elementarySchool->district
+                    ] : null,
+                    'middle_school' => $representativeProperty->middleSchool ? [
+                        'name' => $representativeProperty->middleSchool->name,
+                        'district' => $representativeProperty->middleSchool->district
+                    ] : null,
+                    'high_school' => $representativeProperty->highSchool ? [
+                        'name' => $representativeProperty->highSchool->name,
+                        'district' => $representativeProperty->highSchool->district
+                    ] : null
+                ];
+            }
+        }
+
+        // Format properties list with comprehensive details
+        $formattedProperties = $properties->map(function ($property) {
+            // Load media for each property
+            $property->load(['media', 'details']);
+
+            return [
+                // Basic property information
+                'id' => $property->id,
+                'listing_key' => $property->listing_key,
+                'listing_id' => $property->listing_id,
+                'unit_number' => $property->unit_number,
+
+                // Listing details
+                'price' => $property->list_price,
+                'original_list_price' => $property->original_list_price,
+                'close_price' => $property->close_price,
+                'days_on_market' => $property->days_on_market,
+                'status' => $property->standard_status,
+                'mls_status' => $property->mls_status,
+                'listing_contract_date' => $property->listing_contract_date,
+                'on_market_date' => $property->on_market_date,
+                'off_market_date' => $property->off_market_date,
+                'pending_timestamp' => $property->pending_timestamp,
+                'close_date' => $property->close_date,
+                'contract_status_change_date' => $property->contract_status_change_date,
+                'listing_agreement' => $property->listing_agreement,
+                'contingency' => $property->contingency,
+
+                // Property specifications
+                'bedrooms' => $property->bedrooms_total,
+                'bathrooms' => $property->bathrooms_total_decimal,
+                'bathrooms_full' => $property->bathrooms_full,
+                'bathrooms_half' => $property->bathrooms_half,
+                'living_area' => $property->living_area,
+                'living_area_units' => $property->living_area_units,
+                'year_built' => $property->year_built,
+                'year_built_details' => $property->year_built_details,
+
+                // Parking information
+                'garage_yn' => $property->garage_yn,
+                'garage_spaces' => $property->garage_spaces,
+                'carport_spaces' => $property->carport_spaces,
+                'parking_total' => $property->parking_total,
+
+                // Unit features
+                'furnished' => $property->furnished,
+                'view_yn' => $property->view_yn,
+
+                // Financial information
+                'association_fee' => $property->association_fee,
+                'association_fee_frequency' => $property->association_fee_frequency,
+                'tax_annual_amount' => $property->tax_annual_amount,
+                'tax_year' => $property->tax_year,
+
+                // Unit details
+                'floor_number' => $property->details ? $property->details->floor_number : null,
+                'pets_allowed' => $property->details ? $property->details->miamire_pets_allowed_yn : null,
+                'interior_features' => $property->details ? $property->details->InteriorFeatures : null,
+                'appliances' => $property->details ? $property->details->Appliances : null,
+                'flooring' => $property->details ? $property->details->Flooring : null,
+
+                // Media
+                'photos' => $property->media->map(function ($media) {
+                    return [
+                        'url' => $media->media_url,
+                        'type' => $media->media_type,
+                        'order' => $media->order,
+                        'description' => $media->description
+                    ];
+                }),
+
+                // Timestamps
+                'original_entry_timestamp' => $property->original_entry_timestamp,
+                'modification_timestamp' => $property->modification_timestamp,
+                'price_change_timestamp' => $property->price_change_timestamp,
+                'status_change_timestamp' => $property->status_change_timestamp,
+
+                // Description
+                'public_remarks' => $property->public_remarks,
+                'virtual_tour_url_unbranded' => $property->virtual_tour_url_unbranded,
+
+                // Agent information (if needed)
+                'list_agent_id' => $property->list_agent_id,
+                'list_office_id' => $property->list_office_id
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'building' => $buildingDetails,
+            'properties' => $formattedProperties,
+            'total_properties' => $totalCount,
+            'meta' => [
+                'current_page' => (int) $request->input('page', 1),
+                'per_page' => (int) $request->input('limit', 12),
+                'total' => $totalCount,
+                'last_page' => ceil($totalCount / ($request->input('limit', 12))),
+                'from' => (($request->input('page', 1)) - 1) * $request->input('limit', 12) + 1,
+                'to' => min($request->input('page', 1) * $request->input('limit', 12), $totalCount),
+                'has_more_pages' => ($request->input('page', 1) * $request->input('limit', 12)) < $totalCount,
+            ],
+            'filters' => [
+                'street_number' => $request->input('street_number'),
+                'street_name' => $request->input('street_name'),
+                'building_name' => $request->input('building_name'),
+                'city' => $request->input('city'),
+                'type' => $request->input('type', 'all'),
+                'property_sub_type' => $request->input('property_sub_type'),
+                'min_price' => $request->input('min_price'),
+                'max_price' => $request->input('max_price'),
+                'min_beds' => $request->input('min_beds'),
+                'max_beds' => $request->input('max_beds'),
+                'min_baths' => $request->input('min_baths'),
+                'max_baths' => $request->input('max_baths'),
+                'min_living_size' => $request->input('min_living_size'),
+                'max_living_size' => $request->input('max_living_size'),
+                'sort_by' => $request->input('sort_by', 'list_price'),
+                'sort_dir' => $request->input('sort_dir', 'asc')
+            ]
+        ]);
+    }
 
     /**
      * Format response for properties list based on location filters
