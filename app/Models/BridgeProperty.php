@@ -69,6 +69,12 @@ class BridgeProperty extends Model
         return $this->hasOne(BridgePropertyDetail::class, 'property_id');
     }
 
+    public function propertyDetail()
+{
+    return $this->hasOne(BridgePropertyDetail::class, 'property_id', 'id');
+}
+
+
     public function media()
     {
         return $this->hasMany(BridgePropertyMedia::class, 'property_id');
