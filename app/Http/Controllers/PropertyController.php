@@ -2524,6 +2524,7 @@ class PropertyController extends Controller
             'booleanFeatures',
             'taxInformation',
             'listAgent',
+            'listOffice',
         ])->where('listing_id', $listingId)->first();
 
         if (!$property) {
@@ -2671,7 +2672,7 @@ class PropertyController extends Controller
 
             'Agent_Info' => [
                 'Full Name' => $property->listAgent->full_name,
-                'Office Name' => $property->listAgent->office_name
+                'Office Name' => $property->listOffice->name
             ],
 
             'Room_Information' => [
