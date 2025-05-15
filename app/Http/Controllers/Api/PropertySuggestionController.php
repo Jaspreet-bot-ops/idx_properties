@@ -1458,15 +1458,7 @@ class PropertySuggestionController extends Controller
                 ->groupBy('city', 'state_or_province')
                 ->orderBy('city')
                 ->limit($placeLimit)
-                ->get()
-                ->map(fn($item) => [
-                    'type' => 'place',
-                    'place_type' => 'city',
-                    'name' => $item->city,
-                    'state' => $item->state_or_province,
-                    'display_text' => $item->city . ($item->state_or_province ? ', ' . $item->state_or_province : ''),
-                    'action_url' => "/api/properties/search?city=" . urlencode($item->city)
-                ]);
+                ->get();
 
             $states = DB::table('bridge_properties')
                 ->select('state_or_province')
@@ -1475,15 +1467,7 @@ class PropertySuggestionController extends Controller
                 ->groupBy('state_or_province')
                 ->orderBy('state_or_province')
                 ->limit($placeLimit)
-                ->get()
-                ->map(fn($item) => [
-                    'type' => 'place',
-                    'place_type' => 'state',
-                    'name' => $this->getFullStateName($item->state_or_province),
-                    'code' => $item->state_or_province,
-                    'display_text' => $this->getFullStateName($item->state_or_province),
-                    'action_url' => "/api/properties/search?state=" . urlencode($item->state_or_province)
-                ]);
+                ->get();
 
             $postals = DB::table('bridge_properties')
                 ->select('postal_code', 'state_or_province')
@@ -1492,15 +1476,7 @@ class PropertySuggestionController extends Controller
                 ->groupBy('postal_code', 'state_or_province')
                 ->orderBy('postal_code')
                 ->limit($placeLimit)
-                ->get()
-                ->map(fn($item) => [
-                    'type' => 'place',
-                    'place_type' => 'postal_code',
-                    'name' => $item->postal_code,
-                    'state' => $item->state_or_province,
-                    'display_text' => $item->postal_code . ', ' . $item->state_or_province,
-                    'action_url' => "/api/properties/search?postal_code=" . urlencode($item->postal_code)
-                ]);
+                ->get();
 
             return response()->json([
                 'suggestions' => [
