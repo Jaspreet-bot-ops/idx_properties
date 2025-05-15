@@ -39,6 +39,13 @@ class BridgePropertyDetail extends Model
         'association_yn',
         'disclosures',
         'home_warranty_yn',
+
+        'rooms_description',
+        'bedroom_description',
+        'master_bathroom_description',
+        'master_bath_features',
+        'dining_description',
+        'rooms_total',
         
         // MIAMIRE specific fields
         'miamire_adjusted_area_sf',

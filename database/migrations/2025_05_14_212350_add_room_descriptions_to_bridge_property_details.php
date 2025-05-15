@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('bridge_property_details', function (Blueprint $table) {
-                        $table->text('rooms_description')->nullable();
+            $table->text('rooms_description')->nullable();
             $table->text('bedroom_description')->nullable();
             $table->text('master_bathroom_description')->nullable();
             $table->text('master_bath_features')->nullable();
