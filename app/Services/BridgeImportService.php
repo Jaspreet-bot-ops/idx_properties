@@ -178,7 +178,8 @@ class BridgeImportService
                 // Update existing property
                 $property->update($propertyAttributes);
                 if ($property->details) {
-                    $property->details->update([
+                    BridgePropertyDetail::create([
+                        'property_id' => $property->id,
                         'rooms_description' => $propertyData['RoomsDescription'] ?? null,
                         'bedroom_description' => $propertyData['BedroomDescription'] ?? null,
                         'master_bathroom_description' => $propertyData['MasterBathroomDescription'] ?? null,
