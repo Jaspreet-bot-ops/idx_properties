@@ -177,33 +177,24 @@ class BridgeImportService
             if ($property) {
                 // Update existing property
                 $property->update($propertyAttributes);
-                if ($property->details) {
-                    BridgePropertyDetail::create([
-                        'property_id' => $property->id,
-                        'rooms_description' => $propertyData['RoomsDescription'] ?? null,
-                        'bedroom_description' => $propertyData['BedroomDescription'] ?? null,
-                        'master_bathroom_description' => $propertyData['MasterBathroomDescription'] ?? null,
-                        'master_bath_features' => $propertyData['MasterBathFeatures'] ?? null,
-                        'dining_description' => $propertyData['DiningDescription'] ?? null,
-                        'rooms_total' => $propertyData['RoomsTotal'] ?? null,
-                    ]);
-                    $this->stats['updated']++;
-                    $this->info("Updated property: $listingKey");
-                } else {
-                    // Create new property
-                    $property = BridgeProperty::create($propertyAttributes);
-                    BridgePropertyDetail::create([
-                        'property_id' => $property->id,
-                        'rooms_description' => $propertyData['RoomsDescription'] ?? null,
-                        'bedroom_description' => $propertyData['BedroomDescription'] ?? null,
-                        'master_bathroom_description' => $propertyData['MasterBathroomDescription'] ?? null,
-                        'master_bath_features' => $propertyData['MasterBathFeatures'] ?? null,
-                        'dining_description' => $propertyData['DiningDescription'] ?? null,
-                        'rooms_total' => $propertyData['RoomsTotal'] ?? null,
-                    ]);
-                }
+                $this->stats['updated']++;
+                $this->info("Updated property: $listingKey");
+            } else {
+                // Create new property
+                $property = BridgeProperty::create($propertyAttributes);
                 $this->stats['created']++;
                 $this->info("Created property: $listingKey");
+            }
+
+            if ($property->details) {
+                $property->details->update([
+                    'rooms_description' => $propertyData['RoomsDescription'] ?? null,
+                    'bedroom_description' => $propertyData['BedroomDescription'] ?? null,
+                    'master_bathroom_description' => $propertyData['MasterBathroomDescription'] ?? null,
+                    'master_bath_features' => $propertyData['MasterBathFeatures'] ?? null,
+                    'dining_description' => $propertyData['DiningDescription'] ?? null,
+                    'rooms_total' => $propertyData['RoomsTotal'] ?? null,
+                ]);
             }
 
             // Process property details
