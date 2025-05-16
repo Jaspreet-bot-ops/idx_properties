@@ -1613,22 +1613,19 @@ class PropertySuggestionController extends Controller
         // Add search conditions
         $queryParams['q'] = "UnparsedAddress eq '{$query}*' OR UnparsedAddress like '*{$query}*' OR StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*' OR StateOrProvince like '*{$query}*'";
         
-        // Apply type filter if provided
+        // Apply type filter if
         if ($type) {
             if (strtolower($type) === 'buy') {
-                $queryParams['PropertyType'] = 'Residential';
-                $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
+                $queryParams['PropertyType'] != 'Residential Lease';
+                // $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
             } elseif (strtolower($type) === 'rent') {
                 $queryParams['PropertyType'] = 'Residential Lease';
-                $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
+                // $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
             }
-        } else {
-            // Even if no type is specified, still filter by standard status
-            $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
         }
         
         // Exclude building-type properties
-        $queryParams['PropertySubType.ne'] = implode(',', $individualPropertyTypes);
+        // $queryParams['PropertySubType.ne'] = implode(',', $individualPropertyTypes);
         
         $response = Http::get($baseUrl, $queryParams);
         
