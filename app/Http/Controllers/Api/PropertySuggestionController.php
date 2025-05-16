@@ -1394,75 +1394,67 @@ class PropertySuggestionController extends Controller
                 });
 
             // BUILDING suggestions
-            $buildingSuggestions = DB::table(DB::raw('(
-                SELECT *
-                FROM bridge_properties
-                WHERE 
-                    street_number IS NOT NULL
-                    AND street_name IS NOT NULL
-                    AND property_type NOT LIKE "%Residential Lease%"
-                    AND (
-                        street_name LIKE ? OR city LIKE ?
-                    )
-            ) as bp'))
-            ->leftJoin('bridge_property_details as bpd', 'bp.id', '=', 'bpd.property_id')
-            ->select(
-                'bp.street_number',
-                'bp.street_name',
-                'bp.street_dir_prefix',
-                'bp.city',
-                'bp.state_or_province',
-                'bp.postal_code',
-                'bp.property_type',
-                'bp.property_sub_type',
-                DB::raw('MAX(bpd.building_name) as building_name'),
-                DB::raw('COUNT(bp.id) as unit_count'),
-                DB::raw('MIN(bp.list_price) as min_price'),
-                DB::raw('MAX(bp.list_price) as max_price')
-            )
-            ->where(function ($q) use ($query) {
-                $q->where('bpd.building_name', 'like', "{$query}%")
-                  ->orWhere('bp.city', 'like', "{$query}%");
-            })
-            ->groupBy(
-                'bp.street_number',
-                'bp.street_name',
-                'bp.street_dir_prefix',
-                'bp.city',
-                'bp.state_or_province',
-                'bp.postal_code',
-                'bp.property_type',
-                'bp.property_sub_type'
-            )
-            ->havingRaw('COUNT(bp.id) > 1')
-            ->orderBy('bp.street_name')
-            ->limit($buildingLimit)
-            ->get()
-            ->map(function ($item) {
-                $address = trim($item->street_number . ' ' .
-                    ($item->street_dir_prefix ? $item->street_dir_prefix . ' ' : '') .
-                    $item->street_name);
-                $buildingName = !empty($item->building_name) ? $item->building_name : $address;
-                return [
-                    'type' => 'building',
-                    'building_name' => $buildingName,
-                    'street_number' => $item->street_number,
-                    'street_dir_prefix' => $item->street_dir_prefix,
-                    'street_name' => $item->street_name,
-                    'address' => $address,
-                    'city' => $item->city,
-                    'state' => $item->state_or_province,
-                    'postal_code' => $item->postal_code,
-                    'property_sub_type' => $item->property_sub_type,
-                    'unit_count' => $item->unit_count,
-                    'display_text' => $buildingName .
-                        ($item->city ? ', ' . $item->city : '') .
-                        ($item->state_or_province ? ', ' . $item->state_or_province : '') .
-                        ' (' . $item->unit_count . ' units)',
-                    'action_url' => "/api/buildings?street_number={$item->street_number}&street_name=" . urlencode($item->street_name)
-                ];
-            });
-        
+            $buildingSuggestions = DB::table('bridge_properties as bp')
+                ->leftJoin('bridge_property_details as bpd', 'bp.id', '=', 'bpd.property_id')
+                ->select(
+                    'bp.street_number',
+                    'bp.street_name',
+                    'bp.street_dir_prefix',
+                    'bp.city',
+                    'bp.state_or_province',
+                    'bp.postal_code',
+                    'bp.property_sub_type',
+                    DB::raw('MAX(bpd.building_name) as building_name'),
+                    DB::raw('COUNT(*) as unit_count'),
+                    DB::raw('MIN(bp.list_price) as min_price'),
+                    DB::raw('MAX(bp.list_price) as max_price')
+                )
+                ->whereNotNull('bp.street_number')
+                ->whereNotNull('bp.street_name')
+                ->whereNotIn('bp.property_sub_type', $individualPropertyTypes)
+                ->when($type, function ($q) use ($type) {
+                    if (strtolower($type) === 'buy') {
+                        $q->where('bp.property_type', 'not like', '%Lease%');
+                    } elseif (strtolower($type) === 'rent') {
+                        $q->where('bp.property_type', 'like', '%Lease%');
+                    }
+                })
+                ->where(function ($q) use ($query) {
+                    $q->where(DB::raw("CONCAT(bp.street_number, ' ', bp.street_name)"), 'like', "{$query}%")
+                    ->orWhere('bpd.building_name', 'like', "{$query}%")
+                    ->orWhere('bp.street_name', 'like', "{$query}%")
+                    ->orWhere('bp.city', 'like', "{$query}%");
+                })
+                ->groupBy('bp.street_number', 'bp.street_name', 'bp.street_dir_prefix', 'bp.city', 'bp.state_or_province', 'bp.postal_code', 'bp.property_sub_type')
+                ->havingRaw('COUNT(*) > 1')
+                ->orderBy('bp.street_name')
+                ->limit($buildingLimit)
+                ->get()
+                ->map(function ($item) {
+                    $address = trim($item->street_number . ' ' .
+                        ($item->street_dir_prefix ? $item->street_dir_prefix . ' ' : '') .
+                        $item->street_name);
+                    $buildingName = !empty($item->building_name) ? $item->building_name : $address;
+                    return [
+                        'type' => 'building',
+                        'building_name' => $buildingName,
+                        'street_number' => $item->street_number,
+                        'street_dir_prefix' => $item->street_dir_prefix,
+                        'street_name' => $item->street_name,
+                        'address' => $address,
+                        'city' => $item->city,
+                        'state' => $item->state_or_province,
+                        'postal_code' => $item->postal_code,
+                        'property_sub_type' => $item->property_sub_type,
+                        'unit_count' => $item->unit_count,
+                        'display_text' => $buildingName .
+                            ($item->city ? ', ' . $item->city : '') .
+                            ($item->state_or_province ? ', ' . $item->state_or_province : '') .
+                            ' (' . $item->unit_count . ' units)',
+                        'action_url' => "/api/buildings?street_number={$item->street_number}&street_name=" . urlencode($item->street_name)
+                    ];
+                });
+
             // PLACE suggestions
             $places = collect();
 
