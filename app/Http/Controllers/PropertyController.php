@@ -1454,9 +1454,9 @@ class PropertyController extends Controller
                 $queryParams['PropertyType'] = 'Residential';
                 $queryParams['StandardStatus'] = 'Active';
             } elseif ($request->type === 'rent') {
-                $queryParams['PropertyType'] = 'Residential';
+                $queryParams['PropertyType'] = 'Residential Lease';
                 $queryParams['StandardStatus'] = 'Active';
-                $queryParams['PropertySubType'] = 'Rental';
+                // $queryParams['PropertySubType'] = 'Rental';
             }
         }
         
