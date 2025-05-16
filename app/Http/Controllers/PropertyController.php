@@ -1279,12 +1279,7 @@ class PropertyController extends Controller
         ]);
     }
 
-    /**
-     * Unified property data retrieval function that handles:
-     * 1. Single property details
-     * 2. Building properties
-     * 3. Location-based properties
-     */
+
     public function getProperties(Request $request)
     {
         // Validate common request parameters
@@ -1340,8 +1335,6 @@ class PropertyController extends Controller
         } elseif ($mode === 'building') {
             $validationRules['street_number'] = 'required|string';
             $validationRules['street_name'] = 'required|string';
-            // $validationRules['building_name'] = 'required|string';
-            // $validationRules['city'] = 'required|string';
         } elseif ($mode === 'location') {
             // At least one location parameter is required
             if (!$request->filled('city') && !$request->filled('state') && !$request->filled('postal_code')) {
@@ -1354,87 +1347,551 @@ class PropertyController extends Controller
 
         $request->validate($validationRules);
 
-        // Start with the base query
-        $query = BridgeProperty::with(['details', 'media', 'features']);
-
+        // Base API URL and access token
+        $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
+        $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
+        
+        // Build query parameters for the API request
+        $queryParams = [
+            'access_token' => $accessToken,
+            'limit' => $request->input('limit', 12),
+            'offset' => ($request->input('page', 1) - 1) * $request->input('limit', 12),
+        ];
+        
         // Apply mode-specific filters
         if ($mode === 'property') {
-            $query->where('id', $request->property_id);
+            $queryParams['ListingId'] = $request->property_id;
         } elseif ($mode === 'building') {
-            $query->where('street_number', $request->street_number)
-                ->where('street_name', $request->street_name);
+            $queryParams['StreetNumber'] = $request->street_number;
+            $queryParams['StreetName'] = $request->street_name;
         } elseif ($mode === 'location') {
             if ($request->filled('city')) {
-                $query->where('city', $request->city);
+                $queryParams['City'] = $request->city;
             }
             if ($request->filled('state')) {
-                $query->where('state_or_province', $request->state);
+                $queryParams['StateOrProvince'] = $request->state;
             }
             if ($request->filled('postal_code')) {
-                $query->where('postal_code', $request->postal_code);
+                $queryParams['PostalCode'] = $request->postal_code;
             }
         }
-
+        
         // Apply common filters
-        $this->applyCommonFilters($query, $request);
-
-        // Get total count before pagination (for building and location modes)
-        $totalCount = ($mode !== 'property') ? $query->count() : 1;
-
+        $this->applyBridgeApiFilters($queryParams, $request);
+        
         // Apply sorting
         $sortBy = $request->input('sort_by', 'list_price');
         $sortDir = $request->input('sort_dir', 'asc');
-        $query->orderBy($sortBy, $sortDir);
-
-        // Apply pagination for building and location modes
-        if ($mode !== 'property') {
-            $limit = $request->input('limit', 12);
-            $page = $request->input('page', 1);
-            $offset = ($page - 1) * $limit;
-            $properties = $query->skip($offset)->take($limit)->get();
-        } else {
-            // For single property mode, just get the first result
-            $properties = $query->get();
-        }
-
-        // Format the response based on the mode
-        if ($mode === 'property') {
-            return $this->formatPropertyResponse($properties->first());
-        } elseif ($mode === 'building') {
-            return $this->formatBuildingResponse($properties, $request, $totalCount);
-        } else {
-            return $this->formatLocationResponse($properties, $request, $totalCount);
+        
+        // Map our sort fields to Bridge API field names
+        $sortFieldMap = [
+            'list_price' => 'ListPrice',
+            'list_date' => 'ListDate',
+            'bathrooms_total_decimal' => 'BathroomsTotalDecimal',
+            'bedrooms_total' => 'BedroomsTotal',
+            'living_area' => 'LivingArea',
+            'year_built' => 'YearBuilt',
+            'lot_size_area' => 'LotSizeArea'
+        ];
+        
+        $bridgeSortField = $sortFieldMap[$sortBy] ?? 'ListPrice';
+        $queryParams['order'] = $bridgeSortField . ' ' . strtoupper($sortDir);
+        
+        try {
+            // Make the API request
+            $response = Http::get($baseUrl, $queryParams);
+            
+            if (!$response->successful()) {
+                Log::error('Bridge API request failed', [
+                    'status' => $response->status(),
+                    'response' => $response->json(),
+                    'query' => $queryParams
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to fetch properties from external API'
+                ], 500);
+            }
+            
+            $data = $response->json();
+            $properties = $data['bundle'] ?? [];
+            $totalCount = $data['total'] ?? count($properties);
+            
+            // Format the response based on the mode
+            if ($mode === 'property' && !empty($properties)) {
+                return $this->formatBridgePropertyResponse($properties[0]);
+            } elseif ($mode === 'building') {
+                return $this->formatBridgeBuildingResponse($properties, $request, $totalCount);
+            } else {
+                return $this->formatBridgeLocationResponse($properties, $request, $totalCount);
+            }
+            
+        } catch (\Exception $e) {
+            Log::error('Exception when fetching properties from Bridge API', [
+                'exception' => $e->getMessage(),
+                'query' => $queryParams
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while fetching properties'
+            ], 500);
         }
     }
+    
+    /**
+     * Apply common filters to Bridge API query parameters
+     * 
+     * @param array &$queryParams The query parameters array to modify
+     * @param Request $request The request object
+     */
+    private function applyBridgeApiFilters(&$queryParams, Request $request)
+    {
+        // Property type filters
+        if ($request->filled('type')) {
+            if ($request->type === 'buy') {
+                $queryParams['PropertyType'] = 'Residential';
+                $queryParams['StandardStatus'] = 'Active';
+            } elseif ($request->type === 'rent') {
+                $queryParams['PropertyType'] = 'Residential';
+                $queryParams['StandardStatus'] = 'Active';
+                $queryParams['PropertySubType'] = 'Rental';
+            }
+        }
+        
+        if ($request->filled('property_sub_type')) {
+            $queryParams['PropertySubType'] = $request->property_sub_type;
+        }
+        
+        // Price range
+        if ($request->filled('min_price')) {
+            $queryParams['ListPrice.gte'] = $request->min_price;
+        }
+        if ($request->filled('max_price')) {
+            $queryParams['ListPrice.lte'] = $request->max_price;
+        }
+        
+        // Bedrooms
+        if ($request->filled('min_beds')) {
+            $queryParams['BedroomsTotal.gte'] = $request->min_beds;
+        }
+        if ($request->filled('max_beds')) {
+            $queryParams['BedroomsTotal.lte'] = $request->max_beds;
+        }
+        
+        // Bathrooms
+        if ($request->filled('min_baths')) {
+            $queryParams['BathroomsTotalDecimal.gte'] = $request->min_baths;
+        }
+        if ($request->filled('max_baths')) {
+            $queryParams['BathroomsTotalDecimal.lte'] = $request->max_baths;
+        }
+        
+        // Living size
+        if ($request->filled('min_living_size')) {
+            $queryParams['LivingArea.gte'] = $request->min_living_size;
+        }
+        if ($request->filled('max_living_size')) {
+            $queryParams['LivingArea.lte'] = $request->max_living_size;
+        }
+        
+        // Land size
+        if ($request->filled('min_land_size')) {
+            $queryParams['LotSizeArea.gte'] = $request->min_land_size;
+        }
+        if ($request->filled('max_land_size')) {
+            $queryParams['LotSizeArea.lte'] = $request->max_land_size;
+        }
+        
+        // Year built
+        if ($request->filled('min_year_built')) {
+            $queryParams['YearBuilt.gte'] = $request->min_year_built;
+        }
+        if ($request->filled('max_year_built')) {
+            $queryParams['YearBuilt.lte'] = $request->max_year_built;
+        }
+        
+        // Amenities and features
+        if ($request->filled('parking_spaces')) {
+            $queryParams['ParkingSpaces'] = $request->parking_spaces;
+        }
+        
+        // Boolean features
+        $booleanFeatures = [
+            'waterfront' => 'WaterfrontYN',
+            'pets_allowed' => 'PetsAllowedYN',
+            'furnished' => 'FurnishedYN',
+            'swimming_pool' => 'PoolYN',
+            'golf_course' => 'GolfCourseYN',
+            'tennis_courts' => 'TennisYN',
+            'gated_community' => 'SecurityFeaturesYN',
+            'boat_dock' => 'BoatDockYN',
+            'penthouse' => 'PenthouseYN'
+        ];
+        
+        foreach ($booleanFeatures as $requestKey => $apiKey) {
+            if ($request->filled($requestKey) && $request->boolean($requestKey)) {
+                $queryParams[$apiKey] = 'Y';
+            }
+        }
+        
+        // Special case for waterfront features
+        if ($request->filled('waterfront_features')) {
+            $queryParams['WaterBodyName'] = $request->waterfront_features;
+        }
+    }
+    
+    /**
+     * Format response for a single property from Bridge API
+     * 
+     * @param array $property The property data
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function formatBridgePropertyResponse($property)
+    {
+        if (!$property) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Property not found'
+            ], 404);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'property' => $this->transformBridgeProperty($property)
+        ]);
+    }
+    
+    /**
+     * Format response for building properties from Bridge API
+     * 
+     * @param array $properties The properties data
+     * @param Request $request The request object
+     * @param int $totalCount Total count of properties
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function formatBridgeBuildingResponse($properties, $request, $totalCount)
+    {
+        $transformedProperties = array_map([$this, 'transformBridgeProperty'], $properties);
+        
+        return response()->json([
+            'success' => true,
+            'properties' => $transformedProperties,
+            'pagination' => [
+                'total' => $totalCount,
+                'per_page' => $request->input('limit', 12),
+                'current_page' => $request->input('page', 1),
+                'last_page' => ceil($totalCount / $request->input('limit', 12))
+            ]
+        ]);
+    }
+    
+    /**
+     * Format response for location properties from Bridge API
+     * 
+     * @param array $properties The properties data
+     * @param Request $request The request object
+     * @param int $totalCount Total count of properties
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function formatBridgeLocationResponse($properties, $request, $totalCount)
+    {
+        $transformedProperties = array_map([$this, 'transformBridgeProperty'], $properties);
+        
+        return response()->json([
+            'success' => true,
+            'properties' => $transformedProperties,
+            'pagination' => [
+                'total' => $totalCount,
+                'per_page' => $request->input('limit', 12),
+                'current_page' => $request->input('page', 1),
+                'last_page' => ceil($totalCount / $request->input('limit', 12))
+            ]
+        ]);
+    }
+    
+    /**
+     * Transform a Bridge API property to our expected format
+     * 
+     * @param array $property The property data from Bridge API
+     * @return array Transformed property data
+     */
+       /**
+     * Transform a Bridge API property to our expected format
+     * 
+     * @param array $property The property data from Bridge API
+     * @return array Transformed property data
+     */
+    private function transformBridgeProperty($property)
+    {
+        // Map Bridge API fields to our expected format
+        return [
+            'id' => $property['ListingId'] ?? null,
+            'street_number' => $property['StreetNumber'] ?? null,
+            'street_name' => $property['StreetName'] ?? null,
+            'building_name' => $property['BuildingName'] ?? null,
+            'city' => $property['City'] ?? null,
+            'state' => $property['StateOrProvince'] ?? null,
+            'postal_code' => $property['PostalCode'] ?? null,
+            'list_price' => $property['ListPrice'] ?? null,
+            'list_date' => $property['ListDate'] ?? null,
+            'bedrooms' => $property['BedroomsTotal'] ?? null,
+            'bathrooms' => $property['BathroomsTotalDecimal'] ?? null,
+            'living_area' => $property['LivingArea'] ?? null,
+            'lot_size' => $property['LotSizeArea'] ?? null,
+            'year_built' => $property['YearBuilt'] ?? null,
+            'property_type' => $property['PropertyType'] ?? null,
+            'property_sub_type' => $property['PropertySubType'] ?? null,
+            'description' => $property['PublicRemarks'] ?? null,
+            'status' => $property['StandardStatus'] ?? null,
+            'features' => [
+                'waterfront' => ($property['WaterfrontYN'] ?? 'N') === 'Y',
+                'pets_allowed' => ($property['PetsAllowedYN'] ?? 'N') === 'Y',
+                'furnished' => ($property['FurnishedYN'] ?? 'N') === 'Y',
+                'swimming_pool' => ($property['PoolYN'] ?? 'N') === 'Y',
+                'golf_course' => ($property['GolfCourseYN'] ?? 'N') === 'Y',
+                'tennis_courts' => ($property['TennisYN'] ?? 'N') === 'Y',
+                'gated_community' => ($property['SecurityFeaturesYN'] ?? 'N') === 'Y',
+                'boat_dock' => ($property['BoatDockYN'] ?? 'N') === 'Y',
+                'penthouse' => ($property['PenthouseYN'] ?? 'N') === 'Y',
+                'waterfront_features' => $property['WaterBodyName'] ?? null,
+                'parking_spaces' => $property['ParkingSpaces'] ?? null,
+            ],
+            'media' => $this->extractMediaFromBridgeProperty($property),
+            'location' => [
+                'latitude' => $property['Latitude'] ?? null,
+                'longitude' => $property['Longitude'] ?? null,
+            ],
+            'unparsed_address' => $property['UnparsedAddress'] ?? null,
+        ];
+    }
+
+    /**
+     * Extract media items from Bridge API property data
+     * 
+     * @param array $property The property data from Bridge API
+     * @return array Media items
+     */
+    private function extractMediaFromBridgeProperty($property)
+    {
+        $media = [];
+        
+        // Extract photos from the Media array if available
+        if (isset($property['Media']) && is_array($property['Media'])) {
+            foreach ($property['Media'] as $mediaItem) {
+                if (isset($mediaItem['MediaURL']) && isset($mediaItem['MediaCategory'])) {
+                    $media[] = [
+                        'url' => $mediaItem['MediaURL'],
+                        'type' => $mediaItem['MediaCategory'],
+                        'description' => $mediaItem['MediaDescription'] ?? null,
+                    ];
+                }
+            }
+        }
+        
+        return $media;
+    }
+
+    /**
+     * Determine the mode of operation based on request parameters
+     * 
+     * @param Request $request The request object
+     * @return string|null The mode (property, building, location, or null)
+     */
+    private function determineMode(Request $request)
+    {
+        if ($request->filled('property_id')) {
+            return 'property';
+        } elseif ($request->filled('street_number') && $request->filled('street_name')) {
+            return 'building';
+        } elseif ($request->filled('city') || $request->filled('state') || $request->filled('postal_code')) {
+            return 'location';
+        }
+        
+        return null;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // public function getProperties(Request $request)
+    // {
+    //     // Validate common request parameters
+    //     $validationRules = [
+    //         'property_id' => 'nullable|integer',
+    //         'street_number' => 'nullable|string',
+    //         'street_name' => 'nullable|string',
+    //         'building_name' => 'nullable|string',
+    //         'city' => 'nullable|string',
+    //         'state' => 'nullable|string',
+    //         'postal_code' => 'nullable|string',
+    //         'type' => 'nullable|string|in:buy,rent,all',
+    //         'property_sub_type' => 'nullable|string',
+    //         'min_price' => 'nullable|numeric',
+    //         'max_price' => 'nullable|numeric',
+    //         'min_beds' => 'nullable|integer',
+    //         'max_beds' => 'nullable|integer',
+    //         'min_baths' => 'nullable|numeric',
+    //         'max_baths' => 'nullable|numeric',
+    //         'min_living_size' => 'nullable|numeric',
+    //         'max_living_size' => 'nullable|numeric',
+    //         'min_land_size' => 'nullable|numeric',
+    //         'max_land_size' => 'nullable|numeric',
+    //         'min_year_built' => 'nullable|integer|min:1800|max:2025',
+    //         'max_year_built' => 'nullable|integer|min:1800|max:2025',
+    //         'parking_spaces' => 'nullable|integer',
+    //         'waterfront' => 'nullable|boolean',
+    //         'waterfront_features' => 'nullable|string',
+    //         'pets_allowed' => 'nullable|boolean',
+    //         'furnished' => 'nullable|boolean',
+    //         'swimming_pool' => 'nullable|boolean',
+    //         'golf_course' => 'nullable|boolean',
+    //         'tennis_courts' => 'nullable|boolean',
+    //         'gated_community' => 'nullable|boolean',
+    //         'boat_dock' => 'nullable|boolean',
+    //         'penthouse' => 'nullable|boolean',
+    //         'limit' => 'nullable|integer|min:1',
+    //         'page' => 'nullable|integer|min:1',
+    //         'sort_by' => 'nullable|string|in:list_price,list_date,bathrooms_total_decimal,bedrooms_total,living_area,year_built,lot_size_area',
+    //         'sort_dir' => 'nullable|string|in:asc,desc',
+    //     ];
+
+    //     // Determine the mode based on parameters
+    //     $mode = $this->determineMode($request);
+
+    //     if (!$mode) {
+    //         $mode = 'all'; // Default to getting all properties
+    //     }
+
+    //     // Add mode-specific validation rules
+    //     if ($mode === 'property') {
+    //         $validationRules['property_id'] = 'required|integer';
+    //     } elseif ($mode === 'building') {
+    //         $validationRules['street_number'] = 'required|string';
+    //         $validationRules['street_name'] = 'required|string';
+    //         // $validationRules['building_name'] = 'required|string';
+    //         // $validationRules['city'] = 'required|string';
+    //     } elseif ($mode === 'location') {
+    //         // At least one location parameter is required
+    //         if (!$request->filled('city') && !$request->filled('state') && !$request->filled('postal_code')) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'At least one location parameter (city, state, or postal_code) is required'
+    //             ], 422);
+    //         }
+    //     }
+
+    //     $request->validate($validationRules);
+
+    //     // Start with the base query
+    //     $query = BridgeProperty::with(['details', 'media', 'features']);
+
+    //     // Apply mode-specific filters
+    //     if ($mode === 'property') {
+    //         $query->where('id', $request->property_id);
+    //     } elseif ($mode === 'building') {
+    //         $query->where('street_number', $request->street_number)
+    //             ->where('street_name', $request->street_name);
+    //     } elseif ($mode === 'location') {
+    //         if ($request->filled('city')) {
+    //             $query->where('city', $request->city);
+    //         }
+    //         if ($request->filled('state')) {
+    //             $query->where('state_or_province', $request->state);
+    //         }
+    //         if ($request->filled('postal_code')) {
+    //             $query->where('postal_code', $request->postal_code);
+    //         }
+    //     }
+
+    //     // Apply common filters
+    //     $this->applyCommonFilters($query, $request);
+
+    //     // Get total count before pagination (for building and location modes)
+    //     $totalCount = ($mode !== 'property') ? $query->count() : 1;
+
+    //     // Apply sorting
+    //     $sortBy = $request->input('sort_by', 'list_price');
+    //     $sortDir = $request->input('sort_dir', 'asc');
+    //     $query->orderBy($sortBy, $sortDir);
+
+    //     // Apply pagination for building and location modes
+    //     if ($mode !== 'property') {
+    //         $limit = $request->input('limit', 12);
+    //         $page = $request->input('page', 1);
+    //         $offset = ($page - 1) * $limit;
+    //         $properties = $query->skip($offset)->take($limit)->get();
+    //     } else {
+    //         // For single property mode, just get the first result
+    //         $properties = $query->get();
+    //     }
+
+    //     // Format the response based on the mode
+    //     if ($mode === 'property') {
+    //         return $this->formatPropertyResponse($properties->first());
+    //     } elseif ($mode === 'building') {
+    //         return $this->formatBuildingResponse($properties, $request, $totalCount);
+    //     } else {
+    //         return $this->formatLocationResponse($properties, $request, $totalCount);
+    //     }
+    // }
 
     /**
      * Determine which mode to use based on request parameters
      */
-    protected function determineMode(Request $request)
-    {
-        if ($request->filled('property_id')) {
-            return 'property';
-        }
+    // protected function determineMode(Request $request)
+    // {
+    //     if ($request->filled('property_id')) {
+    //         return 'property';
+    //     }
 
-        if (
-            $request->filled('street_number') &&
-            $request->filled('street_name') &&
-            $request->filled('building_name')
-        ) {
-            return 'building';
-        }
+    //     if (
+    //         $request->filled('street_number') &&
+    //         $request->filled('street_name') &&
+    //         $request->filled('building_name')
+    //     ) {
+    //         return 'building';
+    //     }
 
 
-        if (
-            $request->filled('city') ||
-            $request->filled('state') ||
-            $request->filled('postal_code')
-        ) {
-            return 'location';
-        }
+    //     if (
+    //         $request->filled('city') ||
+    //         $request->filled('state') ||
+    //         $request->filled('postal_code')
+    //     ) {
+    //         return 'location';
+    //     }
 
-        return null; // fallback to "all" mode
-    }
+    //     return null; // fallback to "all" mode
+    // }
 
 
     /**
