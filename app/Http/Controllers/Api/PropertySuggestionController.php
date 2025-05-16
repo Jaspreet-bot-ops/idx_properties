@@ -1692,9 +1692,9 @@ class PropertySuggestionController extends Controller
         // Apply type filter if provided
         if ($type) {
             if (strtolower($type) === 'buy') {
-                $queryParams['PropertyType.ne'] = 'ResidentialLease,CommercialLease';
+                $queryParams['PropertyType.ne'] != 'Residential Lease';
             } elseif (strtolower($type) === 'rent') {
-                $queryParams['PropertyType'] = 'ResidentialLease,CommercialLease';
+                $queryParams['PropertyType'] = 'Residential Lease';
             }
         }
         
