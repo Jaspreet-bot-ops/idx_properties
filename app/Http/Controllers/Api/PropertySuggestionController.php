@@ -1502,7 +1502,7 @@ class PropertySuggestionController extends Controller
         // Get search parameters - support both 'q' and 'query' parameters
         $query = $request->input('q') ?? $request->input('query');
         $type = $request->input('type'); // 'buy' or 'rent'
-        $limit = $request->input('limit', 15); // Default 15 suggestions total
+        $limit = $request->input('limit', 5); // Default 15 suggestions total
     
         // Validate query parameter
         if (empty($query) || strlen($query) < 1) {
@@ -1680,7 +1680,7 @@ class PropertySuggestionController extends Controller
         // For buildings, we need to make a more complex query to group properties by address
         $queryParams = [
             'access_token' => $accessToken,
-            'limit' => 100, // Get more results to ensure we have enough after grouping
+            'limit' => 5, // Get more results to ensure we have enough after grouping
             'fields' => 'ListingId,StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,BuildingName',
             'groupBy' => 'StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode',
             'aggregations' => 'count(*) as UnitCount,min(ListPrice) as MinPrice,max(ListPrice) as MaxPrice,max(BuildingName) as BuildingName'
@@ -1699,7 +1699,7 @@ class PropertySuggestionController extends Controller
         }
         
         // Only include buildings with multiple units
-        $queryParams['UnitCount.gte'] = 2;
+        // $queryParams['UnitCount.gte'] = 2;
         
         $response = Http::get($baseUrl, $queryParams);
         
