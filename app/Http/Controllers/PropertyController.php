@@ -3182,7 +3182,7 @@ class PropertyController extends Controller
             'access_token' => $accessToken
         ]);
 
-        dd($response, $baseUrl . '/' . $listingId);
+        dd($response->json());
         
         // Check if the request was successful
         if (!$response->successful()) {
