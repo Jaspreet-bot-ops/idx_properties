@@ -3178,8 +3178,7 @@ class PropertyController extends Controller
     try {
         // Make API request to fetch the property by listing ID
         $response = Http::get($baseUrl . '/' . $listingId, [
-            'access_token' => $accessToken,
-            'fields' => '_all' // Request all available fields
+            'access_token' => $accessToken
         ]);
         
         // Check if the request was successful
