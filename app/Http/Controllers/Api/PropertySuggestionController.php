@@ -2209,8 +2209,6 @@ private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $
     return $results;
 }
 
-
-
 // Async version of place suggestions
 private function fetchPlaceSuggestionsAsync($baseUrl, $accessToken, $query, $limit)
 {
