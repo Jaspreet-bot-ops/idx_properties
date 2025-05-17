@@ -2008,7 +2008,7 @@ private function fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $t
 }
 
 // Async version of building suggestions
-private function fetchBuildingSuggestions($baseUrl, $accessToken, $query, $type, $limit)
+private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
 {
     // First, try to find buildings directly by searching for BuildingName
     $buildingQueryParams = [
