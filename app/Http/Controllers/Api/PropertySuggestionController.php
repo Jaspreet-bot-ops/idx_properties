@@ -1680,10 +1680,10 @@ class PropertySuggestionController extends Controller
         // For buildings, we need to make a more complex query to group properties by address
         $queryParams = [
             'access_token' => $accessToken,
-            'limit' => 5, // Get more results to ensure we have enough after grouping
+            'limit' => max(1, $limit * 2), // Ensure limit is positive and get extra to filter
             'fields' => 'ListingId,StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,BuildingName',
-            'groupBy' => 'StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode',
-            'aggregations' => 'count(*) as UnitCount,min(ListPrice) as MinPrice,max(ListPrice) as MaxPrice,max(BuildingName) as BuildingName'
+            'groupBy' => 'StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode'
+            // Remove the aggregations parameter
         ];
         
         // Add search conditions
@@ -1692,14 +1692,11 @@ class PropertySuggestionController extends Controller
         // Apply type filter if provided
         if ($type) {
             if (strtolower($type) === 'buy') {
-                $queryParams['PropertyType.ne'] != 'Residential Lease';
+                $queryParams['PropertyType.ne'] = 'Residential Lease'; // Fixed assignment operator
             } elseif (strtolower($type) === 'rent') {
                 $queryParams['PropertyType'] = 'Residential Lease';
             }
         }
-        
-        // Only include buildings with multiple units
-        // $queryParams['UnitCount.gte'] = 2;
         
         $response = Http::get($baseUrl, $queryParams);
         
@@ -1714,41 +1711,54 @@ class PropertySuggestionController extends Controller
         $data = $response->json();
         $buildings = $data['bundle'] ?? [];
         
-        return collect($buildings)->take($limit)->map(function ($item) {
-            $address = trim($item['StreetNumber'] . ' ' . 
-                ($item['StreetDirPrefix'] ? $item['StreetDirPrefix'] . ' ' : '') . 
-                $item['StreetName']);
+        // Process the buildings - we'll need to manually calculate counts and prices
+        $buildingGroups = collect($buildings)->groupBy(function($item) {
+            return $item['StreetNumber'] . '-' . $item['StreetName'] . '-' . $item['City'];
+        });
+        
+        // Only keep groups with multiple units (buildings)
+        $buildingGroups = $buildingGroups->filter(function($group) {
+            return $group->count() > 1;
+        });
+        
+        // Map the building groups to the expected format
+        return $buildingGroups->take($limit)->map(function($group, $key) {
+            $firstItem = $group->first();
+            
+            $address = trim($firstItem['StreetNumber'] . ' ' . 
+                ($firstItem['StreetDirPrefix'] ? $firstItem['StreetDirPrefix'] . ' ' : '') . 
+                $firstItem['StreetName']);
                 
-            $buildingName = !empty($item['BuildingName']) ? $item['BuildingName'] : $address;
+            $buildingName = !empty($firstItem['BuildingName']) ? $firstItem['BuildingName'] : $address;
+            
+            // Calculate min and max prices
+            $prices = $group->pluck('ListPrice')->filter()->values();
+            $minPrice = $prices->min();
+            $maxPrice = $prices->max();
             
             return [
                 'type' => 'building',
                 'building_name' => $buildingName,
-                'street_number' => $item['StreetNumber'],
-                'street_dir_prefix' => $item['StreetDirPrefix'],
-                'street_name' => $item['StreetName'],
+                'street_number' => $firstItem['StreetNumber'],
+                'street_dir_prefix' => $firstItem['StreetDirPrefix'],
+                'street_name' => $firstItem['StreetName'],
                 'address' => $address,
-                'city' => $item['City'],
-                'state' => $item['StateOrProvince'],
-                'postal_code' => $item['PostalCode'],
-                'property_sub_type' => $item['PropertySubType'],
-                'unit_count' => $item['UnitCount'],
-                'min_price' => $item['MinPrice'],
-                'max_price' => $item['MaxPrice'],
+                'city' => $firstItem['City'],
+                'state' => $firstItem['StateOrProvince'],
+                'postal_code' => $firstItem['PostalCode'],
+                'property_sub_type' => $firstItem['PropertySubType'],
+                'unit_count' => $group->count(),
+                'min_price' => $minPrice,
+                'max_price' => $maxPrice,
                 'display_text' => $buildingName . 
-                    ($item['City'] ? ', ' . $item['City'] : '') . 
-                    ($item['StateOrProvince'] ? ', ' . $item['StateOrProvince'] : '') . 
-                    ' (' . $item['UnitCount'] . ' units)',
-                'action_url' => "/api/buildings?street_number={$item['StreetNumber']}&street_name=" . urlencode($item['StreetName'])
+                    ($firstItem['City'] ? ', ' . $firstItem['City'] : '') . 
+                    ($firstItem['StateOrProvince'] ? ', ' . $firstItem['StateOrProvince'] : '') . 
+                    ' (' . $group->count() . ' units)',
+                'action_url' => "/api/buildings?street_number={$firstItem['StreetNumber']}&street_name=" . urlencode($firstItem['StreetName'])
             ];
-        });
-
-        Log::info('Building API response', [
-            'query' => $queryParams,
-            'response_count' => count($buildings),
-            'first_item' => !empty($buildings) ? $buildings[0] : null
-        ]);
+        })->values();
     }
+    
     
     /**
      * Fetch place suggestions (cities, states, postal codes) from Bridge API
