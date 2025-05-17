@@ -3171,6 +3171,7 @@ class PropertyController extends Controller
 
     public function getPropertyByListingId($listingId)
 {
+    dd($listingId,"dgfdkgjf");
     // Bridge API credentials
     $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
     $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
