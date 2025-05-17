@@ -1742,6 +1742,12 @@ class PropertySuggestionController extends Controller
                 'action_url' => "/api/buildings?street_number={$item['StreetNumber']}&street_name=" . urlencode($item['StreetName'])
             ];
         });
+
+        Log::info('Building API response', [
+            'query' => $queryParams,
+            'response_count' => count($buildings),
+            'first_item' => !empty($buildings) ? $buildings[0] : null
+        ]);
     }
     
     /**
