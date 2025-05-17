@@ -3207,7 +3207,7 @@ class PropertyController extends Controller
             ], 404);
         }
         
-        dd($propertyData);
+        // dd($propertyData);
         // Helper function to safely get nested values
         $getValue = function($data, $key, $default = null) {
             return $data[$key] ?? $default;
