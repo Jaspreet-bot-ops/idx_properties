@@ -1918,7 +1918,6 @@ public function autocomplete(Request $request)
                 $results[$key] = collect([]);
             }
         }
-        dd("jaspreet");
         // Format the response
         $response = [
             'suggestions' => [
