@@ -958,6 +958,12 @@ class ImportPropertiesFromBridge extends Command
             'association_yn' => 'AssociationYN',
             'disclosures' => 'Disclosures',
             'home_warranty_yn' => 'HomeWarrantyYN',
+            'rooms_description'=> 'RoomLivingRoomFeatures',
+            'bedroom_description'=> 'RoomBedroomFeatures',
+            'master_bathroom_description'=>'RoomMasterBathroomFeatures',
+            'master_bath_features'=>'RoomMasterBathroomFeatures',
+            'dining_description' => 'RoomDiningRoomFeatures',
+            'rooms_total'=> 'RoomsTotal',
 
             // MIAMIRE specific fields
             'miamire_adjusted_area_sf' => 'MIAMIRE_AdjustedAreaSF',
