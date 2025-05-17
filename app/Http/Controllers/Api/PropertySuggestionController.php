@@ -2008,156 +2008,314 @@ private function fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $t
     };
 }
 
-// Async version of building suggestions
-private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
+// Async version of building suggestionsprivate function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
 {
     return function() use ($baseUrl, $accessToken, $query, $type, $limit) {
-        
-        $queryParams = [
+        // First, try to find buildings directly by searching for BuildingName
+        $buildingQueryParams = [
             'access_token' => $accessToken,
-            'limit' => max(10, $limit * 3), // Get more results to ensure we have enough after filtering
-            'fields' => 'ListingId,StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice,BuildingName',
-            'groupBy' => 'StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType'
+            'limit' => 50,
+            'fields' => 'ListingId,BuildingName,StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice',
+            'q' => "BuildingName like '*{$query}*' OR CONCAT(StreetNumber,' ',StreetName) like '*{$query}*'"
         ];
-        
-        // More comprehensive search conditions to match the previous approach
-        $queryParams['q'] = "CONCAT(StreetNumber,' ',StreetName) like '{$query}*' OR BuildingName like '{$query}*' OR StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*'";
         
         // Apply type filter if provided
         if ($type) {
             if (strtolower($type) === 'buy') {
-                $queryParams['PropertyType.ne'] = 'Residential Lease';
+                $buildingQueryParams['PropertyType.ne'] = 'Residential Lease';
             } elseif (strtolower($type) === 'rent') {
-                $queryParams['PropertyType'] = 'Residential Lease';
+                $buildingQueryParams['PropertyType'] = 'Residential Lease';
             }
         }
         
+        // Log the query parameters for debugging
+        Log::info('Building search query params', $buildingQueryParams);
         
-        $response = Http::get($baseUrl, $queryParams);
+        $response = Http::get($baseUrl, $buildingQueryParams);
         
         if (!$response->successful()) {
             Log::error('Bridge API request failed for building suggestions', [
                 'status' => $response->status(),
-                'response' => $response->json(),
-                'query_params' => $queryParams
+                'response' => $response->json()
             ]);
             return [];
         }
         
         $data = $response->json();
-
-        dd($data,"data");
-        $buildings = $data['bundle'] ?? [];
+        $properties = $data['bundle'] ?? [];
         
-        // Group by address
-        $buildingGroups = [];
-        foreach ($buildings as $building) {
+        // Log the number of properties returned
+        Log::info('Building API returned ' . count($properties) . ' properties');
+        
+        // First, identify buildings by BuildingName
+        $buildingsByName = [];
+        $buildingsByAddress = [];
+        
+        foreach ($properties as $property) {
             // Skip if missing required fields
-            if (!isset($building['StreetNumber']) || !isset($building['StreetName'])) {
+            if (!isset($property['StreetNumber']) || !isset($property['StreetName'])) {
                 continue;
             }
             
-            $key = $building['StreetNumber'] . '-' . $building['StreetName'] . '-' . $building['City'];
+            $address = trim($property['StreetNumber'] . ' ' . $property['StreetName']);
             
-            if (!isset($buildingGroups[$key])) {
-                $buildingGroups[$key] = [
-                    'items' => [],
-                    'count' => 0,
-                    'prices' => [],
-                    'building_names' => [],
-                    'match_score' => 3 // Default lowest priority
-                ];
+            // If it has a BuildingName, group by that
+            if (!empty($property['BuildingName'])) {
+                $buildingName = $property['BuildingName'];
                 
-                // Calculate match score for sorting (like the CASE statement in SQL)
-                $fullAddress = $building['StreetNumber'] . ' ' . $building['StreetName'];
-                $buildingName = $building['BuildingName'] ?? '';
+                if (!isset($buildingsByName[$buildingName])) {
+                    $buildingsByName[$buildingName] = [
+                        'properties' => [],
+                        'address' => $address,
+                        'city' => $property['City'],
+                        'state' => $property['StateOrProvince'],
+                        'postal_code' => $property['PostalCode'] ?? '',
+                        'street_number' => $property['StreetNumber'],
+                        'street_name' => $property['StreetName'],
+                        'street_dir_prefix' => $property['StreetDirPrefix'] ?? '',
+                        'prices' => []
+                    ];
+                }
                 
-                if (stripos($fullAddress, $query) === 0) {
-                    $buildingGroups[$key]['match_score'] = 1; // Highest priority - address starts with query
-                } else if (!empty($buildingName) && stripos($buildingName, $query) === 0) {
-                    $buildingGroups[$key]['match_score'] = 2; // Medium priority - building name starts with query
+                $buildingsByName[$buildingName]['properties'][] = $property;
+                
+                if (isset($property['ListPrice']) && $property['ListPrice'] > 0) {
+                    $buildingsByName[$buildingName]['prices'][] = $property['ListPrice'];
                 }
             }
             
-            $buildingGroups[$key]['items'][] = $building;
-            $buildingGroups[$key]['count']++;
+            // Also group by address for buildings without a name
+            $addressKey = $property['StreetNumber'] . '-' . $property['StreetName'] . '-' . $property['City'];
             
-            if (isset($building['ListPrice']) && $building['ListPrice'] > 0) {
-                $buildingGroups[$key]['prices'][] = $building['ListPrice'];
+            if (!isset($buildingsByAddress[$addressKey])) {
+                $buildingsByAddress[$addressKey] = [
+                    'properties' => [],
+                    'address' => $address,
+                    'city' => $property['City'],
+                    'state' => $property['StateOrProvince'],
+                    'postal_code' => $property['PostalCode'] ?? '',
+                    'street_number' => $property['StreetNumber'],
+                    'street_name' => $property['StreetName'],
+                    'street_dir_prefix' => $property['StreetDirPrefix'] ?? '',
+                    'prices' => []
+                ];
             }
             
-            if (!empty($building['BuildingName'])) {
-                $buildingGroups[$key]['building_names'][] = $building['BuildingName'];
+            $buildingsByAddress[$addressKey]['properties'][] = $property;
+            
+            if (isset($property['ListPrice']) && $property['ListPrice'] > 0) {
+                $buildingsByAddress[$addressKey]['prices'][] = $property['ListPrice'];
             }
         }
         
-        // Filter to only buildings with multiple units
-        $buildingGroups = array_filter($buildingGroups, function($group) {
-            return $group['count'] > 1;
+        // Log the number of potential buildings found
+        Log::info('Found ' . count($buildingsByName) . ' buildings by name');
+        Log::info('Found ' . count($buildingsByAddress) . ' buildings by address');
+        
+        // Filter address-based buildings to only those with multiple units
+        $buildingsByAddress = array_filter($buildingsByAddress, function($building) {
+            return count($building['properties']) > 1;
         });
         
-        // Sort by match score (like the ORDER BY CASE in SQL)
-        uasort($buildingGroups, function($a, $b) {
-            return $a['match_score'] <=> $b['match_score'];
+        Log::info('After filtering, found ' . count($buildingsByAddress) . ' multi-unit buildings by address');
+        
+        // Combine the two sets of buildings, prioritizing those with names
+        $allBuildings = $buildingsByName;
+        
+        // Add address-based buildings that don't overlap with named buildings
+        foreach ($buildingsByAddress as $addressKey => $building) {
+            $addressExists = false;
+            foreach ($buildingsByName as $namedBuilding) {
+                if ($namedBuilding['street_number'] == $building['street_number'] && 
+                    $namedBuilding['street_name'] == $building['street_name'] &&
+                    $namedBuilding['city'] == $building['city']) {
+                    $addressExists = true;
+                    break;
+                }
+            }
+            
+            if (!$addressExists) {
+                $allBuildings[] = $building;
+            }
+        }
+        
+        // Sort buildings by relevance to the query
+        usort($allBuildings, function($a, $b) use ($query) {
+            // If one has a building name that matches the query and the other doesn't
+            $aHasName = isset($a['building_name']) && stripos($a['building_name'], $query) !== false;
+            $bHasName = isset($b['building_name']) && stripos($b['building_name'], $query) !== false;
+            
+            if ($aHasName && !$bHasName) return -1;
+            if (!$aHasName && $bHasName) return 1;
+            
+            // If both or neither have matching names, check the address
+            $aAddressMatch = stripos($a['address'], $query) !== false;
+            $bAddressMatch = stripos($b['address'], $query) !== false;
+            
+            if ($aAddressMatch && !$bAddressMatch) return -1;
+            if (!$aAddressMatch && $bAddressMatch) return 1;
+            
+            // If still tied, sort by unit count (more units first)
+            return count($b['properties']) - count($a['properties']);
         });
         
         // Format the results
         $results = [];
         $count = 0;
         
-        foreach ($buildingGroups as $group) {
+        foreach ($allBuildings as $building) {
             if ($count >= $limit) break;
             
-            $firstItem = $group['items'][0];
+            // For buildings grouped by name, use that name
+            $buildingName = isset($building['building_name']) ? 
+                $building['building_name'] : 
+                $building['address'];
             
-            // Get the most common building name if available
-            $buildingName = '';
-            if (!empty($group['building_names'])) {
-                $nameFrequency = array_count_values($group['building_names']);
-                arsort($nameFrequency);
-                $buildingName = key($nameFrequency);
-            }
-            
-            $address = trim($firstItem['StreetNumber'] . ' ' . 
-                ($firstItem['StreetDirPrefix'] ? $firstItem['StreetDirPrefix'] . ' ' : '') . 
-                $firstItem['StreetName']);
-                
-            // Use building name if available, otherwise use address
-            if (empty($buildingName)) {
-                $buildingName = $address;
-            }
-            
-            $prices = $group['prices'];
+            $prices = $building['prices'];
             $minPrice = !empty($prices) ? min($prices) : null;
             $maxPrice = !empty($prices) ? max($prices) : null;
             
             $results[] = [
                 'type' => 'building',
                 'building_name' => $buildingName,
-                'street_number' => $firstItem['StreetNumber'],
-                'street_dir_prefix' => $firstItem['StreetDirPrefix'] ?? '',
-                'street_name' => $firstItem['StreetName'],
-                'address' => $address,
-                'city' => $firstItem['City'],
-                'state' => $firstItem['StateOrProvince'],
-                'postal_code' => $firstItem['PostalCode'],
-                'property_sub_type' => $firstItem['PropertySubType'],
-                'unit_count' => $group['count'],
+                'address' => $building['address'],
+                'city' => $building['city'],
+                'state' => $building['state'],
+                'postal_code' => $building['postal_code'],
+                'street_number' => $building['street_number'],
+                'street_name' => $building['street_name'],
+                'street_dir_prefix' => $building['street_dir_prefix'],
+                'unit_count' => count($building['properties']),
                 'min_price' => $minPrice,
                 'max_price' => $maxPrice,
                 'display_text' => $buildingName . 
-                    ($firstItem['City'] ? ', ' . $firstItem['City'] : '') . 
-                    ($firstItem['StateOrProvince'] ? ', ' . $firstItem['StateOrProvince'] : '') . 
-                    ' (' . $group['count'] . ' units)',
-                'action_url' => "/api/buildings?street_number={$firstItem['StreetNumber']}&street_name=" . urlencode($firstItem['StreetName'])
+                    ($building['city'] ? ', ' . $building['city'] : '') . 
+                    ($building['state'] ? ', ' . $building['state'] : '') . 
+                    ' (' . count($building['properties']) . ' units)',
+                'action_url' => "/api/buildings?street_number={$building['street_number']}&street_name=" . urlencode($building['street_name'])
             ];
             
             $count++;
         }
         
+        // If we still don't have enough results, try a second approach - search for addresses starting with the query
+        if (count($results) < $limit && is_numeric($query)) {
+            $addressQueryParams = [
+                'access_token' => $accessToken,
+                'limit' => 20,
+                'fields' => 'ListingId,BuildingName,StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice',
+                'q' => "StreetNumber eq '{$query}*'"
+            ];
+            
+            if ($type) {
+                if (strtolower($type) === 'buy') {
+                    $addressQueryParams['PropertyType.ne'] = 'Residential Lease';
+                } elseif (strtolower($type) === 'rent') {
+                    $addressQueryParams['PropertyType'] = 'Residential Lease';
+                }
+            }
+            
+            $addressResponse = Http::get($baseUrl, $addressQueryParams);
+            
+            if ($addressResponse->successful()) {
+                $addressData = $addressResponse->json();
+                $addressProperties = $addressData['bundle'] ?? [];
+                
+                // Group by address
+                $addressGroups = [];
+                foreach ($addressProperties as $property) {
+                    if (!isset($property['StreetNumber']) || !isset($property['StreetName'])) {
+                        continue;
+                    }
+                    
+                    $key = $property['StreetNumber'] . '-' . $property['StreetName'] . '-' . $property['City'];
+                    
+                    if (!isset($addressGroups[$key])) {
+                        $addressGroups[$key] = [
+                            'properties' => [],
+                            'address' => trim($property['StreetNumber'] . ' ' . $property['StreetName']),
+                            'city' => $property['City'],
+                            'state' => $property['StateOrProvince'],
+                            'postal_code' => $property['PostalCode'] ?? '',
+                            'street_number' => $property['StreetNumber'],
+                            'street_name' => $property['StreetName'],
+                            'street_dir_prefix' => $property['StreetDirPrefix'] ?? '',
+                            'building_name' => $property['BuildingName'] ?? '',
+                            'prices' => []
+                        ];
+                    }
+                    
+                    $addressGroups[$key]['properties'][] = $property;
+                    
+                    if (isset($property['ListPrice']) && $property['ListPrice'] > 0) {
+                        $addressGroups[$key]['prices'][] = $property['ListPrice'];
+                    }
+                    
+                    if (!empty($property['BuildingName']) && empty($addressGroups[$key]['building_name'])) {
+                        $addressGroups[$key]['building_name'] = $property['BuildingName'];
+                    }
+                }
+                
+                // Filter to multi-unit buildings
+                $addressGroups = array_filter($addressGroups, function($group) {
+                    return count($group['properties']) > 1;
+                });
+                
+                // Add these to our results
+                foreach ($addressGroups as $group) {
+                    if ($count >= $limit) break;
+                    
+                    // Check if this address is already in our results
+                    $isDuplicate = false;
+                    foreach ($results as $existingResult) {
+                        if ($existingResult['street_number'] == $group['street_number'] && 
+                            $existingResult['street_name'] == $group['street_name'] &&
+                            $existingResult['city'] == $group['city']) {
+                            $isDuplicate = true;
+                            break;
+                        }
+                    }
+                    
+                    if ($isDuplicate) continue;
+                    
+                    $buildingName = !empty($group['building_name']) ? $group['building_name'] : $group['address'];
+                    
+                    $prices = $group['prices'];
+                    $minPrice = !empty($prices) ? min($prices) : null;
+                    $maxPrice = !empty($prices) ? max($prices) : null;
+                    
+                    $results[] = [
+                        'type' => 'building',
+                        'building_name' => $buildingName,
+                        'address' => $group['address'],
+                        'city' => $group['city'],
+                        'state' => $group['state'],
+                        'postal_code' => $group['postal_code'],
+                        'street_number' => $group['street_number'],
+                        'street_name' => $group['street_name'],
+                        'street_dir_prefix' => $group['street_dir_prefix'],
+                        'unit_count' => count($group['properties']),
+                        'min_price' => $minPrice,
+                        'max_price' => $maxPrice,
+                        'display_text' => $buildingName . 
+                            ($group['city'] ? ', ' . $group['city'] : '') . 
+                            ($group['state'] ? ', ' . $group['state'] : '') . 
+                            ' (' . count($group['properties']) . ' units)',
+                        'action_url' => "/api/buildings?street_number={$group['street_number']}&street_name=" . urlencode($group['street_name'])
+                    ];
+                    
+                    $count++;
+                }
+            }
+        }
+        
+        // Log the final number of building results
+        Log::info('Returning ' . count($results) . ' building suggestions');
+        
         return $results;
     };
 }
+
 
 
 // Async version of place suggestions
