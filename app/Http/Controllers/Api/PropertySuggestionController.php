@@ -2008,7 +2008,8 @@ private function fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $t
     };
 }
 
-// Async version of building suggestionsprivate function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
+// Async version of building suggestions
+private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
 {
     return function() use ($baseUrl, $accessToken, $query, $type, $limit) {
         // First, try to find buildings directly by searching for BuildingName
@@ -2315,7 +2316,6 @@ private function fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $t
         return $results;
     };
 }
-
 
 
 // Async version of place suggestions
