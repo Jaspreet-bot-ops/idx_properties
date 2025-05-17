@@ -1965,14 +1965,14 @@ private function fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $t
         // Add search conditions - simplified for better performance
         $queryParams['q'] = "StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '{$query}*'";
         
-        // Apply type filter
-        if ($type) {
-            if (strtolower($type) === 'buy') {
-                $queryParams['PropertyType.ne'] = 'Residential Lease'; // Fixed assignment
-            } elseif (strtolower($type) === 'rent') {
-                $queryParams['PropertyType'] = 'Residential Lease';
-            }
-        }
+        // // Apply type filter
+        // if ($type) {
+        //     if (strtolower($type) === 'buy') {
+        //         $queryParams['PropertyType.ne'] = 'Residential Lease'; // Fixed assignment
+        //     } elseif (strtolower($type) === 'rent') {
+        //         $queryParams['PropertyType'] = 'Residential Lease';
+        //     }
+        // }
         
         $response = Http::get($baseUrl, $queryParams);
         
@@ -2012,16 +2012,23 @@ private function fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $t
 private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
 {
     return function() use ($baseUrl, $accessToken, $query, $type, $limit) {
-        $queryParams = [
-            'access_token' => $accessToken,
-            'limit' => max(1, $limit * 2),
-            'fields' => 'ListingId,StreetNumber,StreetName,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,BuildingName',
-            'groupBy' => 'StreetNumber,StreetName,City'
+        // Define property types that are typically individual properties
+        $individualPropertyTypes = [
+            'Land', 'SingleFamilyResidence', 'Business', 'BusinessOpportunity',
+            'UnimprovedLand', 'Special Purpose'
         ];
         
-        // Simplified search condition for better performance
-        $queryParams['q'] = "BuildingName like '{$query}*' OR StreetName like '{$query}*' OR City like '{$query}*'";
+        $queryParams = [
+            'access_token' => $accessToken,
+            'limit' => max(10, $limit * 3), // Get more results to ensure we have enough after filtering
+            'fields' => 'ListingId,StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice,BuildingName',
+            'groupBy' => 'StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType'
+        ];
         
+        // More comprehensive search conditions to match the previous approach
+        $queryParams['q'] = "CONCAT(StreetNumber,' ',StreetName) like '{$query}*' OR BuildingName like '{$query}*' OR StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*'";
+        
+        // Apply type filter if provided
         if ($type) {
             if (strtolower($type) === 'buy') {
                 $queryParams['PropertyType.ne'] = 'Residential Lease';
@@ -2030,12 +2037,18 @@ private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $
             }
         }
         
+        // Exclude individual property types
+        if (!empty($individualPropertyTypes)) {
+            $queryParams['PropertySubType.ne'] = implode(',', $individualPropertyTypes);
+        }
+        
         $response = Http::get($baseUrl, $queryParams);
         
         if (!$response->successful()) {
             Log::error('Bridge API request failed for building suggestions', [
                 'status' => $response->status(),
-                'response' => $response->json()
+                'response' => $response->json(),
+                'query_params' => $queryParams
             ]);
             return [];
         }
@@ -2046,19 +2059,42 @@ private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $
         // Group by address
         $buildingGroups = [];
         foreach ($buildings as $building) {
+            // Skip if missing required fields
+            if (!isset($building['StreetNumber']) || !isset($building['StreetName'])) {
+                continue;
+            }
+            
             $key = $building['StreetNumber'] . '-' . $building['StreetName'] . '-' . $building['City'];
+            
             if (!isset($buildingGroups[$key])) {
                 $buildingGroups[$key] = [
                     'items' => [],
                     'count' => 0,
-                    'prices' => []
+                    'prices' => [],
+                    'building_names' => [],
+                    'match_score' => 3 // Default lowest priority
                 ];
+                
+                // Calculate match score for sorting (like the CASE statement in SQL)
+                $fullAddress = $building['StreetNumber'] . ' ' . $building['StreetName'];
+                $buildingName = $building['BuildingName'] ?? '';
+                
+                if (stripos($fullAddress, $query) === 0) {
+                    $buildingGroups[$key]['match_score'] = 1; // Highest priority - address starts with query
+                } else if (!empty($buildingName) && stripos($buildingName, $query) === 0) {
+                    $buildingGroups[$key]['match_score'] = 2; // Medium priority - building name starts with query
+                }
             }
             
             $buildingGroups[$key]['items'][] = $building;
             $buildingGroups[$key]['count']++;
+            
             if (isset($building['ListPrice']) && $building['ListPrice'] > 0) {
                 $buildingGroups[$key]['prices'][] = $building['ListPrice'];
+            }
+            
+            if (!empty($building['BuildingName'])) {
+                $buildingGroups[$key]['building_names'][] = $building['BuildingName'];
             }
         }
         
@@ -2067,15 +2103,36 @@ private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $
             return $group['count'] > 1;
         });
         
+        // Sort by match score (like the ORDER BY CASE in SQL)
+        uasort($buildingGroups, function($a, $b) {
+            return $a['match_score'] <=> $b['match_score'];
+        });
+        
         // Format the results
         $results = [];
         $count = 0;
+        
         foreach ($buildingGroups as $group) {
             if ($count >= $limit) break;
             
             $firstItem = $group['items'][0];
-            $address = trim($firstItem['StreetNumber'] . ' ' . $firstItem['StreetName']);
-            $buildingName = !empty($firstItem['BuildingName']) ? $firstItem['BuildingName'] : $address;
+            
+            // Get the most common building name if available
+            $buildingName = '';
+            if (!empty($group['building_names'])) {
+                $nameFrequency = array_count_values($group['building_names']);
+                arsort($nameFrequency);
+                $buildingName = key($nameFrequency);
+            }
+            
+            $address = trim($firstItem['StreetNumber'] . ' ' . 
+                ($firstItem['StreetDirPrefix'] ? $firstItem['StreetDirPrefix'] . ' ' : '') . 
+                $firstItem['StreetName']);
+                
+            // Use building name if available, otherwise use address
+            if (empty($buildingName)) {
+                $buildingName = $address;
+            }
             
             $prices = $group['prices'];
             $minPrice = !empty($prices) ? min($prices) : null;
@@ -2084,11 +2141,21 @@ private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $
             $results[] = [
                 'type' => 'building',
                 'building_name' => $buildingName,
+                'street_number' => $firstItem['StreetNumber'],
+                'street_dir_prefix' => $firstItem['StreetDirPrefix'] ?? '',
+                'street_name' => $firstItem['StreetName'],
                 'address' => $address,
                 'city' => $firstItem['City'],
                 'state' => $firstItem['StateOrProvince'],
+                'postal_code' => $firstItem['PostalCode'],
+                'property_sub_type' => $firstItem['PropertySubType'],
                 'unit_count' => $group['count'],
-                'display_text' => $buildingName . ', ' . $firstItem['City'] . ', ' . $firstItem['StateOrProvince'] . ' (' . $group['count'] . ' units)',
+                'min_price' => $minPrice,
+                'max_price' => $maxPrice,
+                'display_text' => $buildingName . 
+                    ($firstItem['City'] ? ', ' . $firstItem['City'] : '') . 
+                    ($firstItem['StateOrProvince'] ? ', ' . $firstItem['StateOrProvince'] : '') . 
+                    ' (' . $group['count'] . ' units)',
                 'action_url' => "/api/buildings?street_number={$firstItem['StreetNumber']}&street_name=" . urlencode($firstItem['StreetName'])
             ];
             
@@ -2098,6 +2165,7 @@ private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $
         return $results;
     };
 }
+
 
 // Async version of place suggestions
 private function fetchPlaceSuggestionsAsync($baseUrl, $accessToken, $query, $limit)
