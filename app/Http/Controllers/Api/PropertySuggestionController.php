@@ -2012,11 +2012,6 @@ private function fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $t
 private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
 {
     return function() use ($baseUrl, $accessToken, $query, $type, $limit) {
-        // Define property types that are typically individual properties
-        $individualPropertyTypes = [
-            'Land', 'SingleFamilyResidence', 'Business', 'BusinessOpportunity',
-            'UnimprovedLand', 'Special Purpose'
-        ];
         
         $queryParams = [
             'access_token' => $accessToken,
@@ -2037,10 +2032,6 @@ private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $
             }
         }
         
-        // Exclude individual property types
-        if (!empty($individualPropertyTypes)) {
-            $queryParams['PropertySubType.ne'] = implode(',', $individualPropertyTypes);
-        }
         
         $response = Http::get($baseUrl, $queryParams);
         
@@ -2054,6 +2045,8 @@ private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $
         }
         
         $data = $response->json();
+
+        dd($data,"data");
         $buildings = $data['bundle'] ?? [];
         
         // Group by address
