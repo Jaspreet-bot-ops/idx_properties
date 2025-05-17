@@ -1283,6 +1283,11 @@ class PropertyController extends Controller
 
     public function getProperties(Request $request)
     {
+
+        if (!$request->has('type') || $request->type === null) {
+            $request->merge(['type' => 'buy']);
+        }
+
         // Validate common request parameters
         $validationRules = [
             'property_id' => 'nullable|integer',
@@ -1294,6 +1299,7 @@ class PropertyController extends Controller
             'postal_code' => 'nullable|string',
             'type' => 'nullable|string|in:buy,rent,all',
             'property_sub_type' => 'nullable|string',
+            'features' => 'nullable|string',
             'min_price' => 'nullable|numeric',
             'max_price' => 'nullable|numeric',
             'min_beds' => 'nullable|integer',
@@ -1308,7 +1314,7 @@ class PropertyController extends Controller
             'max_year_built' => 'nullable|integer|min:1800|max:2025',
             'parking_spaces' => 'nullable|integer',
             'waterfront' => 'nullable|boolean',
-            'waterfront_features' => 'nullable|string',
+            'waterfront_description' => 'nullable|string',
             'pets_allowed' => 'nullable|boolean',
             'furnished' => 'nullable|boolean',
             'swimming_pool' => 'nullable|boolean',
@@ -1332,7 +1338,7 @@ class PropertyController extends Controller
 
         // Add mode-specific validation rules
         if ($mode === 'property') {
-            $validationRules['property_id'] = 'required|integer';
+            $validationRules['property_id'] = 'required|string';
         } elseif ($mode === 'building') {
             $validationRules['street_number'] = 'required|string';
             $validationRules['street_name'] = 'required|string';
@@ -1351,20 +1357,21 @@ class PropertyController extends Controller
         // Base API URL and access token
         $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
         $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
-        
+
         // Build query parameters for the API request
         $queryParams = [
             'access_token' => $accessToken,
-            'limit' => $request->input('limit', 12),
-            'offset' => ($request->input('page', 1) - 1) * $request->input('limit', 12),
+            'limit' => $request->input('limit', 24),
+            'offset' => ($request->input('page', 1) - 1) * $request->input('limit', 24),
         ];
-        
+
         // Apply mode-specific filters
         if ($mode === 'property') {
             $queryParams['ListingId'] = $request->property_id;
         } elseif ($mode === 'building') {
             $queryParams['StreetNumber'] = $request->street_number;
             $queryParams['StreetName'] = $request->street_name;
+            $queryParams['BuildingName'] = $request->building_name;
         } elseif ($mode === 'location') {
             if ($request->filled('city')) {
                 $queryParams['City'] = $request->city;
@@ -1376,14 +1383,14 @@ class PropertyController extends Controller
                 $queryParams['PostalCode'] = $request->postal_code;
             }
         }
-        
+
         // Apply common filters
         $this->applyBridgeApiFilters($queryParams, $request);
-        
+
         // Apply sorting
         $sortBy = $request->input('sort_by', 'list_price');
         $sortDir = $request->input('sort_dir', 'asc');
-        
+
         // Map our sort fields to Bridge API field names
         $sortFieldMap = [
             'list_price' => 'ListPrice',
@@ -1394,31 +1401,31 @@ class PropertyController extends Controller
             'year_built' => 'YearBuilt',
             'lot_size_area' => 'LotSizeArea'
         ];
-        
+
         $bridgeSortField = $sortFieldMap[$sortBy] ?? 'ListPrice';
         $queryParams['order'] = $bridgeSortField . ' ' . strtoupper($sortDir);
-        
+
         try {
             // Make the API request
             $response = Http::get($baseUrl, $queryParams);
-            
+
             if (!$response->successful()) {
                 Log::error('Bridge API request failed', [
                     'status' => $response->status(),
                     'response' => $response->json(),
                     'query' => $queryParams
                 ]);
-                
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to fetch properties from external API'
                 ], 500);
             }
-            
+
             $data = $response->json();
             $properties = $data['bundle'] ?? [];
             $totalCount = $data['total'] ?? count($properties);
-            
+
             // Format the response based on the mode
             if ($mode === 'property' && !empty($properties)) {
                 return $this->formatBridgePropertyResponse($properties[0]);
@@ -1427,20 +1434,19 @@ class PropertyController extends Controller
             } else {
                 return $this->formatBridgeLocationResponse($properties, $request, $totalCount);
             }
-            
         } catch (\Exception $e) {
             Log::error('Exception when fetching properties from Bridge API', [
                 'exception' => $e->getMessage(),
                 'query' => $queryParams
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'An error occurred while fetching properties'
             ], 500);
         }
     }
-    
+
     /**
      * Apply common filters to Bridge API query parameters
      * 
@@ -1453,18 +1459,27 @@ class PropertyController extends Controller
         if ($request->filled('type')) {
             if ($request->type === 'buy') {
                 $queryParams['PropertyType'] = 'Residential';
-                $queryParams['StandardStatus'] = 'Active';
+                $queryParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
             } elseif ($request->type === 'rent') {
                 $queryParams['PropertyType'] = 'Residential Lease';
-                $queryParams['StandardStatus'] = 'Active';
+                $queryParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
                 // $queryParams['PropertySubType'] = 'Rental';
             }
         }
-        
+
         if ($request->filled('property_sub_type')) {
-            $queryParams['PropertySubType'] = $request->property_sub_type;
+            $propertySubTypes = $request->property_sub_type;
+
+            // Check if it's a comma-separated list
+            if (strpos($propertySubTypes, ',') !== false) {
+                // For multiple values, use the .in operator with the comma-separated list
+                $queryParams['PropertySubType.in'] = $propertySubTypes;
+            } else {
+                // For a single value, use the exact match
+                $queryParams['PropertySubType'] = $propertySubTypes;
+            }
         }
-        
+
         // Price range
         if ($request->filled('min_price')) {
             $queryParams['ListPrice.gte'] = $request->min_price;
@@ -1472,7 +1487,7 @@ class PropertyController extends Controller
         if ($request->filled('max_price')) {
             $queryParams['ListPrice.lte'] = $request->max_price;
         }
-        
+
         // Bedrooms
         if ($request->filled('min_beds')) {
             $queryParams['BedroomsTotal.gte'] = $request->min_beds;
@@ -1480,7 +1495,7 @@ class PropertyController extends Controller
         if ($request->filled('max_beds')) {
             $queryParams['BedroomsTotal.lte'] = $request->max_beds;
         }
-        
+
         // Bathrooms
         if ($request->filled('min_baths')) {
             $queryParams['BathroomsTotalDecimal.gte'] = $request->min_baths;
@@ -1488,7 +1503,7 @@ class PropertyController extends Controller
         if ($request->filled('max_baths')) {
             $queryParams['BathroomsTotalDecimal.lte'] = $request->max_baths;
         }
-        
+
         // Living size
         if ($request->filled('min_living_size')) {
             $queryParams['LivingArea.gte'] = $request->min_living_size;
@@ -1496,15 +1511,15 @@ class PropertyController extends Controller
         if ($request->filled('max_living_size')) {
             $queryParams['LivingArea.lte'] = $request->max_living_size;
         }
-        
+
         // Land size
         if ($request->filled('min_land_size')) {
-            $queryParams['LotSizeArea.gte'] = $request->min_land_size;
+            $queryParams['LotSizeSquareFeet.gte'] = $request->min_land_size;
         }
         if ($request->filled('max_land_size')) {
-            $queryParams['LotSizeArea.lte'] = $request->max_land_size;
+            $queryParams['LotSizeSquareFeet.lte'] = $request->max_land_size;
         }
-        
+
         // Year built
         if ($request->filled('min_year_built')) {
             $queryParams['YearBuilt.gte'] = $request->min_year_built;
@@ -1512,37 +1527,93 @@ class PropertyController extends Controller
         if ($request->filled('max_year_built')) {
             $queryParams['YearBuilt.lte'] = $request->max_year_built;
         }
-        
+
         // Amenities and features
         if ($request->filled('parking_spaces')) {
-            $queryParams['ParkingSpaces'] = $request->parking_spaces;
+            $queryParams['ParkingTotal'] = $request->parking_spaces;
         }
+
+        // if ($request->has('pets_allowed') && $request->boolean('pets_allowed')) {
+        //     $queryParams['MIAMIRE_PetsAllowedYN'] = true;
+        // }
+
+        // if ($request->has('waterfront') && $request->boolean('waterfront')) {
+        //     // Bridge API uses text values for Furnished field
+        //     $queryParams['WaterfrontYN'] = ;
+        // }
         
-        // Boolean features
-        $booleanFeatures = [
-            'waterfront' => 'WaterfrontYN',
-            'pets_allowed' => 'PetsAllowedYN',
-            'furnished' => 'FurnishedYN',
-            'swimming_pool' => 'PoolYN',
-            'golf_course' => 'GolfCourseYN',
-            'tennis_courts' => 'TennisYN',
-            'gated_community' => 'SecurityFeaturesYN',
-            'boat_dock' => 'BoatDockYN',
-            'penthouse' => 'PenthouseYN'
-        ];
-        
-        foreach ($booleanFeatures as $requestKey => $apiKey) {
-            if ($request->filled($requestKey) && $request->boolean($requestKey)) {
-                $queryParams[$apiKey] = 'Y';
+        // Handle feature filtering with support for comma-separated lists
+        if ($request->filled('features')) {
+            $features = $request->features;
+            $featureArray = explode(',', $features);
+
+            // Trim whitespace from each feature
+            $featureArray = array_map('trim', $featureArray);
+
+            // Group features by their target fields
+            $associationAmenities = [];
+            $communityFeatures = [];
+            $architecturalStyles = [];
+            $propertySubTypes = [];
+            $booleanFeatures = [];
+
+            foreach ($featureArray as $feature) {
+                if (stripos($feature, 'Tennis Court') !== false) {
+                    $associationAmenities[] = 'Tennis Court(s)';
+                } else if (stripos($feature, 'Boat Docks') !== false || stripos($feature, 'boat') !== false) {
+                    $associationAmenities[] = 'Boat Dock';
+                } else if (stripos($feature, 'Golf Course') !== false) {
+                    $associationAmenities[] = 'Golf Course';
+                } else if (stripos($feature, 'Swimming Pool') !== false) {
+                    $associationAmenities[] = 'Pool';
+                } else if (stripos($feature, 'Gated Community') !== false) {
+                    $communityFeatures[] = 'Gated Community';
+                } else if (stripos($feature, 'Penthouse') !== false) {
+                    $architecturalStyles[] = 'Penthouse';
+                }
+                else if (stripos($feature, 'Waterfront') !== false) {
+                    // dd("Dfsdfg");
+                    $queryParams["[WaterfrontYN][eq]"] = 'true';
+                }
+                else if (stripos($feature, 'Pet Allowed') !== false) {
+                    $queryParams["[MIAMIRE_PetsAllowedYN][eq]"] = 'true';
+                }
+                // Add more feature mappings as needed
+            }
+
+            // Add the grouped features to the query params using Bridge API format
+            $andIndex = 1; // Start index for AND conditions
+
+            if (!empty($associationAmenities)) {
+                $queryParams["and[{$andIndex}][AssociationAmenities][in]"] = implode(',', $associationAmenities);
+                $andIndex++;
+            }
+
+            if (!empty($communityFeatures)) {
+                $queryParams["and[{$andIndex}][CommunityFeatures][in]"] = implode(',', $communityFeatures);
+                $andIndex++;
+            }
+
+            if (!empty($architecturalStyles)) {
+                $queryParams["and[{$andIndex}][ArchitecturalStyle][in]"] = implode(',', $architecturalStyles);
+                $andIndex++;
             }
         }
-        
+
+
         // Special case for waterfront features
-        if ($request->filled('waterfront_features')) {
-            $queryParams['WaterBodyName'] = $request->waterfront_features;
+        if ($request->filled('waterfront_description')) {
+            // Get the waterfront feature value
+            $waterfrontFeature = $request->waterfront_description;
+
+            // Use exact match with Bridge API's format
+            // Find the next available index for AND conditions
+            $andIndex = isset($queryParams['and']) ? count($queryParams['and']) + 1 : 1;
+
+            $queryParams["and[{$andIndex}][WaterfrontFeatures][eq]"] = $waterfrontFeature;
         }
     }
-    
+
     /**
      * Format response for a single property from Bridge API
      * 
@@ -1557,13 +1628,13 @@ class PropertyController extends Controller
                 'message' => 'Property not found'
             ], 404);
         }
-        
+
         return response()->json([
             'success' => true,
             'property' => $this->transformBridgeProperty($property)
         ]);
     }
-    
+
     /**
      * Format response for building properties from Bridge API
      * 
@@ -1575,19 +1646,19 @@ class PropertyController extends Controller
     private function formatBridgeBuildingResponse($properties, $request, $totalCount)
     {
         $transformedProperties = array_map([$this, 'transformBridgeProperty'], $properties);
-        
+
         return response()->json([
             'success' => true,
             'properties' => $transformedProperties,
             'pagination' => [
                 'total' => $totalCount,
-                'per_page' => $request->input('limit', 12),
+                'per_page' => $request->input('limit', 24),
                 'current_page' => $request->input('page', 1),
-                'last_page' => ceil($totalCount / $request->input('limit', 12))
+                'last_page' => ceil($totalCount / $request->input('limit', 24))
             ]
         ]);
     }
-    
+
     /**
      * Format response for location properties from Bridge API
      * 
@@ -1599,26 +1670,26 @@ class PropertyController extends Controller
     private function formatBridgeLocationResponse($properties, $request, $totalCount)
     {
         $transformedProperties = array_map([$this, 'transformBridgeProperty'], $properties);
-        
+
         return response()->json([
             'success' => true,
             'properties' => $transformedProperties,
             'pagination' => [
                 'total' => $totalCount,
-                'per_page' => $request->input('limit', 12),
+                'per_page' => $request->input('limit', 24),
                 'current_page' => $request->input('page', 1),
-                'last_page' => ceil($totalCount / $request->input('limit', 12))
+                'last_page' => ceil($totalCount / $request->input('limit', 24))
             ]
         ]);
     }
-    
+
     /**
      * Transform a Bridge API property to our expected format
      * 
      * @param array $property The property data from Bridge API
      * @return array Transformed property data
      */
-       /**
+    /**
      * Transform a Bridge API property to our expected format
      * 
      * @param array $property The property data from Bridge API
@@ -1628,9 +1699,11 @@ class PropertyController extends Controller
     {
         // Map Bridge API fields to our expected format
         return [
-            'id' => $property['ListingId'] ?? null,
+            // 'id' => $property['ListingId'] ?? null,
+            'listing_id' => $property['ListingId'] ?? null,
             'street_number' => $property['StreetNumber'] ?? null,
             'street_name' => $property['StreetName'] ?? null,
+            'address' => trim($property['StreetNumber'] . ' ' . $property['StreetName']),
             'building_name' => $property['BuildingName'] ?? null,
             'city' => $property['City'] ?? null,
             'state' => $property['StateOrProvince'] ?? null,
@@ -1646,19 +1719,19 @@ class PropertyController extends Controller
             'property_sub_type' => $property['PropertySubType'] ?? null,
             'description' => $property['PublicRemarks'] ?? null,
             'status' => $property['StandardStatus'] ?? null,
-            'features' => [
-                'waterfront' => ($property['WaterfrontYN'] ?? 'N') === 'Y',
-                'pets_allowed' => ($property['PetsAllowedYN'] ?? 'N') === 'Y',
-                'furnished' => ($property['FurnishedYN'] ?? 'N') === 'Y',
-                'swimming_pool' => ($property['PoolYN'] ?? 'N') === 'Y',
-                'golf_course' => ($property['GolfCourseYN'] ?? 'N') === 'Y',
-                'tennis_courts' => ($property['TennisYN'] ?? 'N') === 'Y',
-                'gated_community' => ($property['SecurityFeaturesYN'] ?? 'N') === 'Y',
-                'boat_dock' => ($property['BoatDockYN'] ?? 'N') === 'Y',
-                'penthouse' => ($property['PenthouseYN'] ?? 'N') === 'Y',
-                'waterfront_features' => $property['WaterBodyName'] ?? null,
-                'parking_spaces' => $property['ParkingSpaces'] ?? null,
-            ],
+            // 'features' => [
+            //     'waterfront' => ($property['WaterfrontYN'] ?? 'N') === 'Y',
+            //     'pets_allowed' => ($property['PetsAllowedYN'] ?? 'N') === 'Y',
+            //     'furnished' => ($property['FurnishedYN'] ?? 'N') === 'Y',
+            //     'swimming_pool' => ($property['PoolYN'] ?? 'N') === 'Y',
+            //     'golf_course' => ($property['GolfCourseYN'] ?? 'N') === 'Y',
+            //     'tennis_courts' => ($property['TennisYN'] ?? 'N') === 'Y',
+            //     'gated_community' => ($property['SecurityFeaturesYN'] ?? 'N') === 'Y',
+            //     'boat_dock' => ($property['BoatDockYN'] ?? 'N') === 'Y',
+            //     'penthouse' => ($property['PenthouseYN'] ?? 'N') === 'Y',
+            //     'waterfront_features' => $property['WaterBodyName'] ?? null,
+            //     'parking_spaces' => $property['ParkingSpaces'] ?? null,
+            // ],
             'media' => $this->extractMediaFromBridgeProperty($property),
             'location' => [
                 'latitude' => $property['Latitude'] ?? null,
@@ -1677,7 +1750,7 @@ class PropertyController extends Controller
     private function extractMediaFromBridgeProperty($property)
     {
         $media = [];
-        
+
         // Extract photos from the Media array if available
         if (isset($property['Media']) && is_array($property['Media'])) {
             foreach ($property['Media'] as $mediaItem) {
@@ -1690,7 +1763,7 @@ class PropertyController extends Controller
                 }
             }
         }
-        
+
         return $media;
     }
 
@@ -1709,7 +1782,7 @@ class PropertyController extends Controller
         } elseif ($request->filled('city') || $request->filled('state') || $request->filled('postal_code')) {
             return 'location';
         }
-        
+
         return null;
     }
 
@@ -2056,17 +2129,6 @@ class PropertyController extends Controller
             });
         }
 
-        // Swimming pool - under Association Amenities
-        if ($request->has('swimming_pool') && $request->boolean('swimming_pool')) {
-            $query->whereHas('features', function ($q) {
-                $q->where('name', 'LIKE', '%Pool%')
-                    ->whereHas('category', function ($categoryQuery) {
-                        $categoryQuery->where('name', 'Association Amenities');
-                    });
-            });
-        }
-
-        // Gated community - under Community Features
         if ($request->has('gated_community') && $request->boolean('gated_community')) {
             $query->whereHas('features', function ($q) {
                 $q->where(function ($subQuery) {
@@ -2090,67 +2152,19 @@ class PropertyController extends Controller
                     });
             });
         }
+
+        // Swimming pool - under Association Amenities
+        if ($request->has('swimming_pool') && $request->boolean('swimming_pool')) {
+            $query->whereHas('features', function ($q) {
+                $q->where('name', 'LIKE', '%Pool%')
+                    ->whereHas('category', function ($categoryQuery) {
+                        $categoryQuery->where('name', 'Association Amenities');
+                    });
+            });
+        }
+
+        // Gated community - under Community Features
     }
-
-    /**
-     * Format response for a single property
-     */
-    /**
-     * Format response for a single property
-     */
-    // private function formatPropertyResponse($property)
-    // {
-    //     if (!$property) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Property not found'
-    //         ], 404);
-    //     }
-
-    //     // Load additional relationships for a single property
-    //     $property->load(['listAgent', 'listOffice', 'media', 'features']);
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'property' => [
-    //             'id' => $property->id,
-    //             'listing_key' => $property->listing_key,
-    //             'address' => trim($property->street_number . ' ' . $property->street_name),
-    //             'unit_number' => $property->unit_number,
-    //             'city' => $property->city,
-    //             'state' => $property->state_or_province,
-    //             'postal_code' => $property->postal_code,
-    //             'property_type' => $property->property_type,
-    //             'property_sub_type' => $property->property_sub_type,
-    //             'status' => $property->standard_status,
-    //             'price' => $property->list_price,
-    //             'bedrooms' => $property->bedrooms_total,
-    //             'bathrooms' => $property->bathrooms_total_decimal,
-    //             'living_area' => $property->living_area,
-    //             'lot_size' => $property->lot_size_acres,
-    //             'year_built' => $property->year_built,
-    //             'description' => $property->public_remarks,
-    //             'photos' => $property->media->map(function ($media) {
-    //                 return [
-    //                     'url' => $media->media_url,
-    //                     'type' => $media->media_type
-    //                 ];
-    //             }),
-    //             // 'features' => $property->features->pluck('name'),
-    //             // 'agent' => $property->listAgent ? [
-    //             //     'name' => $property->listAgent->full_name,
-    //             //     'phone' => $property->listAgent->phone,
-    //             //     'email' => $property->listAgent->email
-    //             // ] : null,
-    //             // 'office' => $property->listOffice ? [
-    //             //     'name' => $property->listOffice->name,
-    //             //     'phone' => $property->listOffice->phone
-    //             // ] : null,
-    //             // Additional fields can be added here as needed
-    //         ]
-    //     ]);
-    // }
-
 
     private function formatPropertyResponse($property)
     {
@@ -2418,67 +2432,6 @@ class PropertyController extends Controller
             'property' => $propertyData
         ]);
     }
-
-
-    // /**
-    //  * Format response for building properties list
-    //  */
-    // private function formatBuildingResponse($properties, Request $request, $totalCount)
-    // {
-    //     // Prepare building details from the first property
-    //     $buildingDetails = null;
-    //     $representativeProperty = $properties->first();
-    //     if ($representativeProperty && $representativeProperty->details) {
-    //         $buildingDetails = [
-    //             'building_name' => $representativeProperty->details->building_name ?? null,
-    //             'year_built' => $representativeProperty->year_built,
-    //             'address' => trim($request->input('street_number') . ' ' . $request->input('street_name')),
-    //             // 'city' => $representativeProperty->city,
-    //             'state' => $representativeProperty->state_or_province,
-    //             'postal_code' => $representativeProperty->postal_code,
-    //             'total_units' => $totalCount,
-    //             'property_sub_type' => $representativeProperty->property_sub_type,
-    //             // Add other building details as needed
-    //         ];
-    //     }
-
-    //     // Format properties list
-    //     $formattedProperties = $properties->map(function ($property) {
-    //         // Fetch media for each property
-    //         $mediaUrls = $property->media->map(function ($media) {
-    //             return $media->media_url;
-    //         });
-    //         return [
-    //             'id' => $property->id,
-    //             'listing_key' => $property->listing_key,
-    //             'unit_number' => $property->unit_number,
-    //             'price' => $property->list_price,
-    //             'bedrooms' => $property->bedrooms_total,
-    //             'bathrooms' => $property->bathrooms_total_decimal,
-    //             'living_area' => $property->living_area,
-    //             'status' => $property->standard_status,
-    //             'photos' => $mediaUrls,
-    //             // Add other property details as needed
-    //         ];
-    //     });
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'building' => $buildingDetails,
-    //         'properties' => $formattedProperties,
-    //         'total_properties' => $totalCount,
-    //         'meta' => [
-    //             'current_page' => (int) $request->input('page', 1),
-    //             'per_page' => (int) $request->input('limit', 12),
-    //             'total' => $totalCount,
-    //             'last_page' => ceil($totalCount / ($request->input('limit', 12))),
-    //             'from' => (($request->input('page', 1)) - 1) * $request->input('limit', 12) + 1,
-    //             'to' => min($request->input('page', 1) * $request->input('limit', 12), $totalCount),
-    //             'has_more_pages' => ($request->input('page', 1) * $request->input('limit', 12)) < $totalCount,
-    //         ],
-    //         // Additional info or filters can be added here
-    //     ]);
-    // }
 
     private function formatBuildingResponse($properties, Request $request, $totalCount)
     {
@@ -2854,350 +2807,33 @@ class PropertyController extends Controller
 
     // public function getPropertyByListingId($listingId)
     // {
-    //     $property = BridgeProperty::with(['details', 'media', 'features', 'taxInformation'])->where('listing_id', $listingId)->first();
-
-    //     if (!$property) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Property not found with the provided listing ID'
-    //         ], 404);
-    //     }
-
-    //     // Format the property data in the requested format
-    //     $formattedProperty = [
-    //         'id' => $property->id,
-    //         'status' => $property->mls_status,
-    //         'MlsStatus' => $property->listing_id,
-    //         'DaysOnMarket' => $property->days_on_market,
-    //         'Taxs' => $property->tax_annual_amount,
-    //         'HOA' => $property->association_fee,
-    //         'PropertyType' => $property->property_sub_type,
-    //         'YearBuilt' => $property->year_built,
-    //         'LotSize' => $property->lot_size_square_feet . ' ' . $property->lot_size_units,
-    //         'County' => $property->county_or_parish,
-    //         'listing_id' => $property->listing_id,
-    //         'listing_key' => $property->listing_key,
-    //         'address' => trim($property->street_number . ' ' . $property->street_name),
-    //         'unit_number' => $property->unit_number,
-    //         'city' => $property->city,
-    //         'state' => $property->state_or_province,
-    //         'postal_code' => $property->postal_code,
-    //         'price' => $property->list_price,
-    //         'bedrooms' => $property->bedrooms_total,
-    //         'bathrooms' => $property->bathrooms_total_decimal,
-    //         'status' => $property->standard_status,
-    //         'photos' => $property->media->map(function ($media) {
-    //             return $media->media_url;
-    //         }),
-
-    //         'Property_details' => [
-    //             'Subdivision' => $property->details->subdivision_name ?? null,
-    //             'Style' => $property->details->miamire_style ?? null,
-    //             'WaterFront' => $property->waterfront_yn ?? null,
-    //             'View' => $property->details->view ?? null,
-    //             'Furnished' => $property->furnished ?? null,
-    //             'Area' => $property->details->miamire_area ?? null,
-    //             'Sqft Total' => $property->details->building_area_total ?? null,
-    //             'Sqft LivArea' => $property->living_area ?? null,
-    //             'AdjustedAreaSF' => $property->details->miamire_adjusted_area_sf ?? null,
-    //             'YearBuilt Description' => $property->year_built_details ?? null
-    //         ],
-
-    //         'Building_Information' => [
-    //             'Stories' => $property->stories_total ?? null,
-    //             'YearBuilt' => $property->year_built ?? null,
-    //             'Lot Size' => $property->lot_size_square_feet . ' ' . $property->lot_size_units
-    //         ],
-
-    //         'Property_Information' => [
-    //             'Parcel Number' => $property->parcel_number ?? null,
-    //             'Parcel Number MLX' => $property->parcel_number ? substr($property->parcel_number, -4) : null,
-    //             'MlsArea' => $property->taxInformation->public_survey_township ?? null,
-    //             'TownshipRange' => $property->taxInformation->public_survey_range ?? null,
-    //             'Section' => $property->taxInformation->public_survey_section ?? null,
-    //             'Subdivision Complex Bldg' => $property->details->subdivision_name ?? null,
-    //             'Zoning Information' => $property->details->zoning ?? null
-    //         ],
-
-    //         'General_Information' => [
-    //             'Num Garage Space' => $property->garage_spaces ?? null,
-    //             'Num Carport Space' => $property->carport_spaces ?? null,
-    //             'Parking Description' => $property->details->ParkingFeatures ?? null,
-    //             'Spa' => $property->spa_yn ?? null,
-    //             'Pool' => $property->pool_private_yn ?? null,
-    //             'Pool Description' => $property->details->PoolFeatures ?? null,
-    //             'Front Exposure' => $property->details->direction_faces ?? null,
-    //             'Approximate LotSize' => $property->lot_size_square_feet ?? null,
-    //             'Property Sqft' => $property->lot_size_square_feet ?? null,
-    //             'Lot Description' => $property->details->LotFeatures ?? null,
-    //             'Pool Dimensions' => $property->details->miamire_pool_dimensions ?? null,
-    //             'Design' => $property->details->ArchitecturalStyle ?? null,
-    //             'Design Description' => $property->details->ArchitecturalStyle ?? null,
-    //             'Construction' => $property->details->ConstructionMaterials ?? null,
-    //             'Roof Description' => $property->details->RoofFeatures ?? null,
-    //             'Flooring' => $property->details->Flooring ?? null,
-    //             'Floor Description' => $property->details->Flooring ?? null,
-    //             'Virtual Tour' => $property->details->VirtualTour ?? null,
-    //         ],
-
-    //         'Financial_Information' => [
-    //             'Type of Association' => $property->details->miamire_type_of_association ?? null,
-    //             'Assoc fee paid per' => $property->association_fee_frequency ?? null,
-    //             'Tax Year' => $property->tax_year ?? null,
-    //             'Tax Information' => $property->details->tax_legal_description ?? null
-    //         ],
-
-    //         'Additional_Property_Information' => [
-    //             'Heating Description' => $property->details->Heating ?? null,
-    //             'Cooling Description' => $property->details->Cooling ?? null,
-    //             'Water Description' => $property->details->WaterSource ?? null,
-    //             'Sewer Description' => $property->details->Sewer ?? null,
-    //             'Pets Allowed' => $property->details->miamire_pets_allowed_yn ?? null,
-    //             'Guest House Description' => $property->details->miamire_guest_house_description ?? null,
-    //             'Furnished' => $property->furnished ?? null,
-    //             'Interior Features' => $property->details->InteriorFeatures ?? null,
-    //             'Equipment Appliances' => $property->details->Appliances ?? null,
-    //             'Window Treatment' => $property->details->WindowFeatures ?? null,
-    //             'Exterior Features' => $property->details->ExteriorFeatures ?? null,
-    //             'Subdivision Information' => $property->details->miamire_subdivision_information ?? null
-    //         ]
-    //     ];
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'property' => $formattedProperty
-    //     ]);
-    // }
-
-    /**
-     * Get property by listing ID with comprehensive custom formatting
-     * 
-     * @param string $listingId The listing ID to retrieve
-     * @return \Illuminate\Http\JsonResponse
-     */
-    // public function getPropertyByListingId($listingId)
-    // {
-    //     // Load property with all necessary relationships
-    //     $property = BridgeProperty::with([
-    //         'details',
-    //         'media',
-    //         'features.category', // Include the category relationship
-    //         'booleanFeatures',
-    //         'taxInformation',
-    //         'listAgent',
-    //         'listOffice',
-    //     ])->where('listing_id', $listingId)->first();
-
-    //     if (!$property) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Property not found with the provided listing ID'
-    //         ], 404);
-    //     }
-
-    //     // Group features by category for easier access
-    //     $featuresGrouped = collect();
-    //     if ($property->features && $property->features->count() > 0) {
-    //         $featuresGrouped = $property->features->groupBy(function ($feature) {
-    //             return $feature->category ? $feature->category->name : 'Other';
-    //         });
-    //     }
-
-    //     // Helper function to get features by category as comma-separated string
-    //     $getFeaturesByCategory = function ($categoryName) use ($featuresGrouped) {
-    //         $features = $featuresGrouped->get($categoryName, collect())->pluck('name')->toArray();
-    //         return !empty($features) ? implode(', ', $features) : null;
-    //     };
-
-    //     $jsonToCommaString = function ($jsonString) {
-    //         if (empty($jsonString)) return null;
-
-    //         try {
-    //             $array = json_decode($jsonString, true);
-    //             if (is_array($array) && !empty($array)) {
-    //                 return implode(', ', $array);
-    //             }
-    //             return $jsonString; // Return original if not a valid JSON array
-    //         } catch (\Exception $e) {
-    //             return $jsonString; // Return original on error
-    //         }
-    //     };
-
-    //     // Get specific feature categories
-    //     $heatingFeatures = $getFeaturesByCategory('Heating');
-    //     $coolingFeatures = $getFeaturesByCategory('Cooling');
-    //     $waterFeatures = $getFeaturesByCategory('Water');
-    //     $sewerFeatures = $getFeaturesByCategory('Sewer');
-    //     $interiorFeatures = $getFeaturesByCategory('Interior Features');
-    //     $applianceFeatures = $getFeaturesByCategory('Appliances');
-    //     $windowFeatures = $getFeaturesByCategory('Window Features');
-    //     $exteriorFeatures = $getFeaturesByCategory('Exterior Features');
-    //     $parkingFeatures = $getFeaturesByCategory('Parking Features');
-    //     $poolFeatures = $getFeaturesByCategory('Pool Features');
-    //     $lotFeatures = $getFeaturesByCategory('Lot Features');
-    //     $roofFeatures = $getFeaturesByCategory('Roof Features');
-    //     $architecturalStyle = $getFeaturesByCategory('Architectural Style');
-    //     $constructionMaterials = $getFeaturesByCategory('Construction Materials');
-    //     $flooringFeatures = $getFeaturesByCategory('Flooring');
-    //     $communityFeatures = $getFeaturesByCategory('Community Features');
-    //     $guestHouseDescription = $jsonToCommaString($property->details->miamire_guest_house_description ?? null);
-    //     $typeOfAssociation = $jsonToCommaString($property->details->miamire_type_of_association ?? null);
-    //     $subdivisionInformation = $jsonToCommaString($property->details->miamire_subdivision_information ?? null);
-    //     // Format the property data in the requested format
-    //     $formattedProperty = [
-    //         'id' => $property->id,
-    //         'status' => $property->mls_status,
-    //         'MlsStatus' => $property->listing_id,
-    //         'DaysOnMarket' => $property->days_on_market,
-    //         'Taxs' => $property->tax_annual_amount,
-    //         'HOA' => $property->association_fee,
-    //         'PropertyType' => $property->property_sub_type,
-    //         'YearBuilt' => $property->year_built,
-    //         'LotSize' => $property->living_area . ' Sqft',
-    //         'County' => $property->county_or_parish,
-    //         'listing_id' => $property->listing_id,
-    //         'listing_key' => $property->listing_key,
-    //         'street_number' => $property->street_number,
-    //         'street_name' => $property->street_name,
-    //         'unparsed_address' => $property->unparsed_address,
-    //         'address' => trim($property->street_number . ' ' . $property->street_name),
-    //         'unit_number' => $property->unit_number,
-    //         'latitude' => $property->latitude,
-    //         'longitude' => $property->longitude,
-    //         'city' => $property->city,
-    //         'state' => $property->state_or_province,
-    //         'postal_code' => $property->postal_code,
-    //         'price' => $property->list_price,
-    //         'bedrooms' => $property->bedrooms_total,
-    //         'bathrooms' => $property->bathrooms_full,
-    //         'photos' => $property->media->map(function ($media) {
-    //             return $media->media_url;
-    //         }),
-
-    //         'SyndicationRemarks' => $property->syndication_remarks,
-
-    //         'Property_details' => [
-    //             'Subdivision' => $property->details->subdivision_name ?? null,
-    //             'Style' => $property->details->miamire_style ?? null,
-    //             'WaterFront' => $property->waterfront_yn ?? null,
-    //             'View' => $property->details->view ?? null,
-    //             'Water Description' => $waterFeatures,
-    //             // 'Furnished' => $property->furnished ?? null,
-    //             'Area' => $property->details->miamire_area ?? null,
-    //             'Sqft Total' => $property->details->building_area_total ?? null,
-    //             'Sqft LivArea' => $property->living_area ?? null,
-    //             'AdjustedAreaSF' => $property->details->miamire_adjusted_area_sf ?? null,
-    //             'YearBuilt Description' => $property->year_built_details ?? null
-    //         ],
-
-    //         'Building_Information' => [
-    //             'Stories' => $property->stories_total ?? null,
-    //             'Building Size' => '-',
-    //             'YearBuilt' => $property->year_built ?? null,
-    //             'Lot Size' => $property->lot_size_square_feet . ' ' . $property->lot_size_units
-    //         ],
-
-    //         'Property_Information' => [
-    //             'Parcel Number' => $property->parcel_number ?? null,
-    //             'Parcel Number MLX' => $property->parcel_number ? substr($property->parcel_number, -4) : null,
-    //             'MlsArea' => $property->taxInformation->public_survey_township ?? null,
-    //             'TownshipRange' => $property->taxInformation->public_survey_range ?? null,
-    //             'Section' => $property->taxInformation->public_survey_section ?? null,
-    //             'Subdivision Complex Bldg' => $property->details->subdivision_name ?? null,
-    //             'Zoning Information' => $property->details->zoning ?? null
-    //         ],
-
-    //         'General_Information' => [
-    //             'Num Garage Space' => $property->garage_spaces ?? null,
-    //             'Num Carport Space' => $property->carport_spaces ?? null,
-    //             'Parking Description' => $parkingFeatures,
-    //             'Spa' => $property->spa_yn ?? null,
-    //             'Pool' => $property->miamire_pool_yn ?? null,
-    //             'Pool Description' => $poolFeatures,
-    //             'Front Exposure' => $property->details->direction_faces ?? null,
-    //             'Approximate LotSize' => $property->lot_size_square_feet ?? null,
-    //             'Property Sqft' => $property->lot_size_square_feet ?? null,
-    //             'Lot Description' => $lotFeatures,
-    //             'Pool Dimensions' => $property->details->miamire_pool_dimensions ?? null,
-    //             'Design' => $architecturalStyle,
-    //             'Design Description' => $architecturalStyle,
-    //             'Construction' => $constructionMaterials,
-    //             'Roof Description' => $roofFeatures,
-    //             'Flooring' => $flooringFeatures,
-    //             'Floor Description' => $flooringFeatures
-    //         ],
-
-    //         'Financial_Information' => [
-    //             'Type of Association' => $typeOfAssociation,
-    //             'Assoc fee paid per' => $property->association_fee_frequency ?? null,
-    //             'Tax Year' => $property->tax_year ?? null,
-    //             'Tax Information' => $property->details->tax_legal_description ?? null
-    //         ],
-
-    //         'Agent_Info' => [
-    //             'Full Name' => $property->listAgent->full_name,
-    //             'Office Name' => $property->listOffice->name
-    //         ],
-
-    //         'Room_Information' => [
-    //             'Room Description' =>$property->details->rooms_description ?? null,
-    //             'Bedroom Description' => $property->details->bedroom_description ?? null,
-    //             'Master Bathroom Description:' => $property->details->master_bathroom_description ?? null,
-    //             'Master Bath Features' => $property->details->master_bath_features ?? null,
-    //             'Dining Description' => $property->details->dining_description ?? null,
-    //         ],
-
-    //         'Additional_Property_Information' => [
-    //             'Heating Description' => $heatingFeatures,
-    //             'Cooling Description' => $coolingFeatures,
-    //             'Water Description' => $waterFeatures,
-    //             'Sewer Description' => $sewerFeatures,
-    //             'Pets Allowed' => $property->details->miamire_pets_allowed_yn ?? null,
-    //             'Guest House Description' => $guestHouseDescription,
-    //             'Furnished' => $property->furnished ?? null,
-    //             'Interior Features' => $interiorFeatures,
-    //             'Equipment Appliances' => $applianceFeatures,
-    //             'Window Treatment' => $windowFeatures,
-    //             'Exterior Features' => $exteriorFeatures,
-    //             'Subdivision Information' => $subdivisionInformation
-    //         ],
-    //     ];
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'property' => $formattedProperty
-    //     ]);
-    // }
-
-    // public function getPropertyByListingId($listingId)
-    // {
     //     // Bridge API credentials
     //     $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
     //     $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
-        
+
     //     try {
     //         // Make API request to fetch the property by listing ID
     //         $response = Http::get($baseUrl . '/' . $listingId, [
     //             'access_token' => $accessToken,
     //             'fields' => '_all' // Request all available fields
     //         ]);
-            
+
     //         // Check if the request was successful
     //         if (!$response->successful()) {
     //             Log::error('Bridge API request failed for listing ID: ' . $listingId, [
     //                 'status' => $response->status(),
     //                 'response' => $response->json()
     //             ]);
-                
+
     //             return response()->json([
     //                 'success' => false,
     //                 'message' => 'Property not found with the provided listing ID'
     //             ], 404);
     //         }
-            
+
     //         // Get the property data from the response
     //         $responseData = $response->json();
-            
+
     //         // Check if the bundle key exists in the response
     //         if (!isset($responseData['bundle'])) {
     //             return response()->json([
@@ -3205,15 +2841,15 @@ class PropertyController extends Controller
     //                 'message' => 'Invalid API response format'
     //             ], 500);
     //         }
-            
+
     //         // Extract the property data from the bundle
     //         $propertyData = $responseData['bundle'];
-            
+
     //         // Helper function to safely get nested values
     //         $getValue = function($data, $key, $default = null) {
     //             return $data[$key] ?? $default;
     //         };
-            
+
     //         // Helper function to convert JSON string to comma-separated string
     //         $jsonToCommaString = function ($jsonString) {
     //             if (empty($jsonString)) return null;
@@ -3227,7 +2863,7 @@ class PropertyController extends Controller
     //                 return $jsonString; // Return original on error
     //             }
     //         };
-            
+
     //         // Helper function to convert array to comma-separated string
     //         $arrayToCommaString = function ($array) {
     //             if (empty($array)) return null;
@@ -3236,7 +2872,7 @@ class PropertyController extends Controller
     //             }
     //             return $array;
     //         };
-            
+
     //         // Extract photos from Media array
     //         $photos = [];
     //         if (isset($propertyData['Media']) && is_array($propertyData['Media'])) {
@@ -3246,13 +2882,13 @@ class PropertyController extends Controller
     //                 }
     //             }
     //         }
-            
+
     //         // Format the address
     //         $streetNumber = $getValue($propertyData, 'StreetNumber', '');
     //         $streetDirPrefix = $getValue($propertyData, 'StreetDirPrefix', '');
     //         $streetName = $getValue($propertyData, 'StreetName', '');
     //         $address = trim($streetNumber . ' ' . $streetDirPrefix . ' ' . $streetName);
-            
+
     //         // Format the property data in the requested format
     //         $formattedProperty = [
     //             'id' => $getValue($propertyData, 'ListingId'),
@@ -3282,7 +2918,7 @@ class PropertyController extends Controller
     //             'bathrooms' => $getValue($propertyData, 'BathroomsFull'),
     //             'photos' => $photos,
     //             'SyndicationRemarks' => $getValue($propertyData, 'SyndicationRemarks'),
-                
+
     //             'Property_details' => [
     //                 'Subdivision' => $getValue($propertyData, 'SubdivisionName'),
     //                 'Style' => $getValue($propertyData, 'MIAMIRE_Style'),
@@ -3295,14 +2931,14 @@ class PropertyController extends Controller
     //                 'AdjustedAreaSF' => $getValue($propertyData, 'MIAMIRE_AdjustedAreaSF'),
     //                 'YearBuilt Description' => $getValue($propertyData, 'YearBuiltDetails')
     //             ],
-                
+
     //             'Building_Information' => [
     //                 'Stories' => $getValue($propertyData, 'StoriesTotal'),
     //                 'Building Size' => '-',
     //                 'YearBuilt' => $getValue($propertyData, 'YearBuilt'),
     //                 'Lot Size' => $getValue($propertyData, 'LotSizeSquareFeet') . ' ' . $getValue($propertyData, 'LotSizeUnits')
     //             ],
-                
+
     //             'Property_Information' => [
     //                 'Parcel Number' => $getValue($propertyData, 'ParcelNumber'),
     //                 'Parcel Number MLX' => $getValue($propertyData, 'ParcelNumber') ? substr($getValue($propertyData, 'ParcelNumber'), -4) : null,
@@ -3312,7 +2948,7 @@ class PropertyController extends Controller
     //                 'Subdivision Complex Bldg' => $getValue($propertyData, 'SubdivisionName'),
     //                 'Zoning Information' => $getValue($propertyData, 'Zoning')
     //             ],
-                
+
     //             'General_Information' => [
     //                 'Num Garage Space' => $getValue($propertyData, 'GarageSpaces'),
     //                 'Num Carport Space' => $getValue($propertyData, 'CarportSpaces'),
@@ -3332,19 +2968,19 @@ class PropertyController extends Controller
     //                 'Flooring' => $arrayToCommaString($getValue($propertyData, 'Flooring')),
     //                 'Floor Description' => $arrayToCommaString($getValue($propertyData, 'Flooring'))
     //             ],
-                
+
     //             'Financial_Information' => [
     //                 'Type of Association' => $arrayToCommaString($getValue($propertyData, 'MIAMIRE_TypeofAssociation')),
     //                 'Assoc fee paid per' => $getValue($propertyData, 'AssociationFeeFrequency'),
     //                 'Tax Year' => $getValue($propertyData, 'TaxYear'),
     //                 'Tax Information' => $getValue($propertyData, 'TaxLegalDescription')
     //             ],
-                
+
     //             'Agent_Info' => [
     //                 'Full Name' => $getValue($propertyData, 'ListAgentFullName'),
     //                 'Office Name' => $getValue($propertyData, 'ListOfficeName')
     //             ],
-                
+
     //             'Room_Information' => [
     //                 'Room Description' => null, // Not directly available in API response
     //                 'Bedroom Description' => null, // Not directly available in API response
@@ -3352,7 +2988,7 @@ class PropertyController extends Controller
     //                 'Master Bath Features' => null, // Not directly available in API response
     //                 'Dining Description' => null, // Not directly available in API response
     //             ],
-                
+
     //             'Additional_Property_Information' => [
     //                 'Heating Description' => $arrayToCommaString($getValue($propertyData, 'Heating')),
     //                 'Cooling Description' => $arrayToCommaString($getValue($propertyData, 'Cooling')),
@@ -3368,19 +3004,19 @@ class PropertyController extends Controller
     //                 'Subdivision Information' => $arrayToCommaString($getValue($propertyData, 'MIAMIRE_SubdivisionInformation')),
     //             ],
     //         ];
-            
+
     //         return response()->json([
     //             'success' => true,
     //             'property' => $formattedProperty
     //         ]);
-            
+
     //     } catch (\Exception $e) {
     //         Log::error('Exception when fetching property from Bridge API', [
     //             'listing_id' => $listingId,
     //             'exception' => $e->getMessage(),
     //             'trace' => $e->getTraceAsString()
     //         ]);
-            
+
     //         return response()->json([
     //             'success' => false,
     //             'message' => 'An error occurred while fetching the property: ' . $e->getMessage()
@@ -3389,210 +3025,209 @@ class PropertyController extends Controller
     // }
 
     public function getPropertyByListingId($listingId)
-{
-    // Bridge API credentials
-    $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
-    $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
-    
-    try {
-        // Make API request to fetch the property by listing ID or listing key
-        $response = Http::get($baseUrl . '/' . $listingId, [
-            'access_token' => $accessToken
-        ]);
-        
-        // Check if the request was successful
-        if (!$response->successful()) {
-            Log::error('Bridge API request failed for listing ID: ' . $listingId, [
-                'status' => $response->status(),
-                'response' => $response->body()
+    {
+        // Bridge API credentials
+        $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
+        $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
+
+        try {
+            // Make API request to fetch the property by listing ID or listing key
+            $response = Http::get($baseUrl . '/' . $listingId, [
+                'access_token' => $accessToken
             ]);
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Property not found with the provided listing ID'
-            ], 404);
-        }
-        
-        // Get the property data from the response
-        $responseData = $response->json();
-        
-        // Check if the bundle key exists in the response
-        if (!isset($responseData['bundle'])) {
-            Log::error('Invalid API response format for listing ID: ' . $listingId, [
-                'response' => $responseData
-            ]);
-            
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid API response format'
-            ], 500);
-        }
-        
-        // Extract the property data from the bundle
-        $propertyData = $responseData['bundle'];
-        
-        // Extract photos from Media array
-        $photos = [];
-        if (isset($propertyData['Media']) && is_array($propertyData['Media'])) {
-            foreach ($propertyData['Media'] as $media) {
-                if (isset($media['MediaURL']) && ($media['MediaCategory'] ?? '') === 'Photo') {
-                    $photos[] = $media['MediaURL'];
+
+            // Check if the request was successful
+            if (!$response->successful()) {
+                Log::error('Bridge API request failed for listing ID: ' . $listingId, [
+                    'status' => $response->status(),
+                    'response' => $response->body()
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Property not found with the provided listing ID'
+                ], 404);
+            }
+
+            // Get the property data from the response
+            $responseData = $response->json();
+
+            // Check if the bundle key exists in the response
+            if (!isset($responseData['bundle'])) {
+                Log::error('Invalid API response format for listing ID: ' . $listingId, [
+                    'response' => $responseData
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid API response format'
+                ], 500);
+            }
+
+            // Extract the property data from the bundle
+            $propertyData = $responseData['bundle'];
+
+            // Extract photos from Media array
+            $photos = [];
+            if (isset($propertyData['Media']) && is_array($propertyData['Media'])) {
+                foreach ($propertyData['Media'] as $media) {
+                    if (isset($media['MediaURL']) && ($media['MediaCategory'] ?? '') === 'Photo') {
+                        $photos[] = $media['MediaURL'];
+                    }
                 }
             }
-        }
-        
-        // Format the address
-        $streetNumber = $propertyData['StreetNumber'] ?? '';
-        $streetDirPrefix = $propertyData['StreetDirPrefix'] ?? '';
-        $streetName = $propertyData['StreetName'] ?? '';
-        $address = trim($streetNumber . ' ' . ($streetDirPrefix ? $streetDirPrefix . ' ' : '') . $streetName);
-        
-        // Helper function to convert arrays to comma-separated strings
-        $arrayToString = function($array) {
-            if (empty($array)) return null;
-            if (is_array($array)) {
-                return implode(', ', $array);
-            }
-            return (string)$array;
-        };
-        
-        // Format the property data in the requested format
-        $formattedProperty = [
-            'id' => $propertyData['ListingId'] ?? null,
-            'status' => $propertyData['StandardStatus'] ?? null,
-            'MlsStatus' => $propertyData['MlsStatus'] ?? null,
-            'DaysOnMarket' => $propertyData['DaysOnMarket'] ?? null,
-            'Taxs' => $propertyData['TaxAnnualAmount'] ?? null,
-            'HOA' => $propertyData['AssociationFee'] ?? null,
-            'PropertyType' => $propertyData['PropertySubType'] ?? null,
-            'YearBuilt' => $propertyData['YearBuilt'] ?? null,
-            'LotSize' => ($propertyData['LivingArea'] ?? '') . ' Sqft',
-            'County' => $propertyData['CountyOrParish'] ?? null,
-            'listing_id' => $propertyData['ListingId'] ?? null,
-            'listing_key' => $propertyData['ListingKey'] ?? null,
-            'street_number' => $streetNumber,
-            'street_name' => $streetName,
-            'unparsed_address' => $propertyData['UnparsedAddress'] ?? null,
-            'address' => $address,
-            'unit_number' => $propertyData['UnitNumber'] ?? null,
-            'latitude' => $propertyData['Latitude'] ?? null,
-            'longitude' => $propertyData['Longitude'] ?? null,
-            'city' => $propertyData['City'] ?? null,
-            'state' => $propertyData['StateOrProvince'] ?? null,
-            'postal_code' => $propertyData['PostalCode'] ?? null,
-            'price' => $propertyData['ListPrice'] ?? null,
-            'bedrooms' => $propertyData['BedroomsTotal'] ?? null,
-            'bathrooms' => $propertyData['BathroomsFull'] ?? null,
-            'photos' => $photos,
-            'SyndicationRemarks' => $propertyData['SyndicationRemarks'] ?? null,
-            
-            'Property_details' => [
-                'Subdivision' => $propertyData['SubdivisionName'] ?? null,
-                'Style' => $propertyData['MIAMIRE_Style'] ?? null,
-                'WaterFront' => $propertyData['WaterfrontYN'] ?? null,
-                'View' => $arrayToString($propertyData['View'] ?? null),
-                'Water Description' => $arrayToString($propertyData['WaterfrontFeatures'] ?? null),
-                'Area' => $propertyData['MIAMIRE_Area'] ?? null,
-                'Sqft Total' => $propertyData['BuildingAreaTotal'] ?? null,
-                'Sqft LivArea' => $propertyData['LivingArea'] ?? null,
-                'AdjustedAreaSF' => $propertyData['MIAMIRE_AdjustedAreaSF'] ?? null,
-                'YearBuilt Description' => $propertyData['YearBuiltDetails'] ?? null
-            ],
-            
-            'Building_Information' => [
-                'Stories' => $propertyData['StoriesTotal'] ?? null,
-                'Building Size' => $propertyData['BuildingAreaTotal'] ?? '-',
+
+            // Format the address
+            $streetNumber = $propertyData['StreetNumber'] ?? '';
+            $streetDirPrefix = $propertyData['StreetDirPrefix'] ?? '';
+            $streetName = $propertyData['StreetName'] ?? '';
+            $address = trim($streetNumber . ' ' . ($streetDirPrefix ? $streetDirPrefix . ' ' : '') . $streetName);
+
+            // Helper function to convert arrays to comma-separated strings
+            $arrayToString = function ($array) {
+                if (empty($array)) return null;
+                if (is_array($array)) {
+                    return implode(', ', $array);
+                }
+                return (string)$array;
+            };
+
+            // Format the property data in the requested format
+            $formattedProperty = [
+                'id' => $propertyData['ListingId'] ?? null,
+                'status' => $propertyData['StandardStatus'] ?? null,
+                'MlsStatus' => $propertyData['MlsStatus'] ?? null,
+                'DaysOnMarket' => $propertyData['DaysOnMarket'] ?? null,
+                'Taxs' => $propertyData['TaxAnnualAmount'] ?? null,
+                'HOA' => $propertyData['AssociationFee'] ?? null,
+                'PropertyType' => $propertyData['PropertySubType'] ?? null,
                 'YearBuilt' => $propertyData['YearBuilt'] ?? null,
-                'Lot Size' => ($propertyData['LotSizeSquareFeet'] ?? '') . ' ' . ($propertyData['LotSizeUnits'] ?? '')
-            ],
-            
-            'Property_Information' => [
-                'Parcel Number' => $propertyData['ParcelNumber'] ?? null,
-                'Parcel Number MLX' => isset($propertyData['ParcelNumber']) ? substr($propertyData['ParcelNumber'], -4) : null,
-                'MlsArea' => $propertyData['MLSAreaMajor'] ?? null,
-                'TownshipRange' => $propertyData['PublicSurveyRange'] ?? null,
-                'Section' => $propertyData['PublicSurveySection'] ?? null,
-                'Subdivision Complex Bldg' => $propertyData['SubdivisionName'] ?? null,
-                'Zoning Information' => $propertyData['Zoning'] ?? null
-            ],
-            
-            'General_Information' => [
-                'Num Garage Space' => $propertyData['GarageSpaces'] ?? null,
-                'Num Carport Space' => $propertyData['CarportSpaces'] ?? null,
-                'Parking Description' => $arrayToString($propertyData['ParkingFeatures'] ?? null),
-                'Spa' => $propertyData['SpaYN'] ?? null,
-                'Pool' => $propertyData['MIAMIRE_PoolYN'] ?? null,
-                'Pool Description' => $arrayToString($propertyData['PoolFeatures'] ?? null),
-                'Front Exposure' => $propertyData['DirectionFaces'] ?? null,
-                'Approximate LotSize' => $propertyData['LotSizeSquareFeet'] ?? null,
-                'Property Sqft' => $propertyData['LotSizeSquareFeet'] ?? null,
-                'Lot Description' => $arrayToString($propertyData['LotFeatures'] ?? null),
-                'Pool Dimensions' => $propertyData['MIAMIRE_PoolDimensions'] ?? null,
-                'Design' => $arrayToString($propertyData['ArchitecturalStyle'] ?? null),
-                'Design Description' => $arrayToString($propertyData['ArchitecturalStyle'] ?? null),
-                'Construction' => $arrayToString($propertyData['ConstructionMaterials'] ?? null),
-                'Roof Description' => $arrayToString($propertyData['Roof'] ?? null),
-                'Flooring' => $arrayToString($propertyData['Flooring'] ?? null),
-                'Floor Description' => $arrayToString($propertyData['Flooring'] ?? null)
-            ],
-            
-            'Financial_Information' => [
-                'Type of Association' => $arrayToString($propertyData['MIAMIRE_TypeofAssociation'] ?? null),
-                'Assoc fee paid per' => $propertyData['AssociationFeeFrequency'] ?? null,
-                'Tax Year' => $propertyData['TaxYear'] ?? null,
-                'Tax Information' => $propertyData['TaxLegalDescription'] ?? null
-            ],
-            
-            'Agent_Info' => [
-                'Full Name' => $propertyData['ListAgentFullName'] ?? null,
-                'Office Name' => $propertyData['ListOfficeName'] ?? null
-            ],
-            
-            'Room_Information' => [
-                'Room Description' => null,
-                'Bedroom Description' => $arrayToString($propertyData['RoomBedroomFeatures'] ?? null),
-                'Master Bathroom Description:' => $arrayToString($propertyData['RoomMasterBathroomFeatures'] ?? null),
-                'Master Bath Features' => $arrayToString($propertyData['RoomMasterBathroomFeatures'] ?? null),
-                'Dining Description' => $arrayToString($propertyData['RoomDiningRoomFeatures'] ?? null)
-            ],
-            
-            'Additional_Property_Information' => [
-                'Heating Description' => $arrayToString($propertyData['Heating'] ?? null),
-                'Cooling Description' => $arrayToString($propertyData['Cooling'] ?? null),
-                'Water Description' => $arrayToString($propertyData['WaterSource'] ?? null),
-                'Sewer Description' => $arrayToString($propertyData['Sewer'] ?? null),
-                'Pets Allowed' => $propertyData['MIAMIRE_PetsAllowedYN'] ?? null,
-                'Guest House Description' => $arrayToString($propertyData['MIAMIRE_GuestHouseDescription'] ?? null),
-                'Furnished' => $propertyData['Furnished'] ?? null,
-                'Interior Features' => $arrayToString($propertyData['InteriorFeatures'] ?? null),
-                'Equipment Appliances' => $arrayToString($propertyData['Appliances'] ?? null),
-                'Window Treatment' => $arrayToString($propertyData['WindowFeatures'] ?? null),
-                'Exterior Features' => $arrayToString($propertyData['ExteriorFeatures'] ?? null),
-                'Subdivision Information' => $arrayToString($propertyData['MIAMIRE_SubdivisionInformation'] ?? null)
-            ]
-        ];
-        
-        // Log the successful mapping for debugging
-        Log::info('Successfully mapped property data for listing ID: ' . $listingId);
-        
-        return response()->json([
-            'success' => true,
-            'property' => $formattedProperty
-        ]);
-        
-    } catch (\Exception $e) {
-        Log::error('Exception when fetching property from Bridge API', [
-            'listing_id' => $listingId,
-            'exception' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-        
-        return response()->json([
-            'success' => false,
-            'message' => 'An error occurred while fetching the property: ' . $e->getMessage()
-        ], 500);
+                'LotSize' => ($propertyData['LivingArea'] ?? '') . ' Sqft',
+                'County' => $propertyData['CountyOrParish'] ?? null,
+                'listing_id' => $propertyData['ListingId'] ?? null,
+                'listing_key' => $propertyData['ListingKey'] ?? null,
+                'street_number' => $streetNumber,
+                'street_name' => $streetName,
+                'unparsed_address' => $propertyData['UnparsedAddress'] ?? null,
+                'address' => $address,
+                'unit_number' => $propertyData['UnitNumber'] ?? null,
+                'latitude' => $propertyData['Latitude'] ?? null,
+                'longitude' => $propertyData['Longitude'] ?? null,
+                'city' => $propertyData['City'] ?? null,
+                'state' => $propertyData['StateOrProvince'] ?? null,
+                'postal_code' => $propertyData['PostalCode'] ?? null,
+                'price' => $propertyData['ListPrice'] ?? null,
+                'bedrooms' => $propertyData['BedroomsTotal'] ?? null,
+                'bathrooms' => $propertyData['BathroomsFull'] ?? null,
+                'photos' => $photos,
+                'SyndicationRemarks' => $propertyData['SyndicationRemarks'] ?? null,
+
+                'Property_details' => [
+                    'Subdivision' => $propertyData['SubdivisionName'] ?? null,
+                    'Style' => $propertyData['MIAMIRE_Style'] ?? null,
+                    'WaterFront' => $propertyData['WaterfrontYN'] ?? null,
+                    'View' => $arrayToString($propertyData['View'] ?? null),
+                    'Water Description' => $arrayToString($propertyData['WaterfrontFeatures'] ?? null),
+                    'Area' => $propertyData['MIAMIRE_Area'] ?? null,
+                    'Sqft Total' => $propertyData['BuildingAreaTotal'] ?? null,
+                    'Sqft LivArea' => $propertyData['LivingArea'] ?? null,
+                    'AdjustedAreaSF' => $propertyData['MIAMIRE_AdjustedAreaSF'] ?? null,
+                    'YearBuilt Description' => $propertyData['YearBuiltDetails'] ?? null
+                ],
+
+                'Building_Information' => [
+                    'Stories' => $propertyData['StoriesTotal'] ?? null,
+                    'Building Size' => $propertyData['BuildingAreaTotal'] ?? '-',
+                    'YearBuilt' => $propertyData['YearBuilt'] ?? null,
+                    'Lot Size' => ($propertyData['LotSizeSquareFeet'] ?? '') . ' ' . ($propertyData['LotSizeUnits'] ?? '')
+                ],
+
+                'Property_Information' => [
+                    'Parcel Number' => $propertyData['ParcelNumber'] ?? null,
+                    'Parcel Number MLX' => isset($propertyData['ParcelNumber']) ? substr($propertyData['ParcelNumber'], -4) : null,
+                    'MlsArea' => $propertyData['MLSAreaMajor'] ?? null,
+                    'TownshipRange' => $propertyData['PublicSurveyRange'] ?? null,
+                    'Section' => $propertyData['PublicSurveySection'] ?? null,
+                    'Subdivision Complex Bldg' => $propertyData['SubdivisionName'] ?? null,
+                    'Zoning Information' => $propertyData['Zoning'] ?? null
+                ],
+
+                'General_Information' => [
+                    'Num Garage Space' => $propertyData['GarageSpaces'] ?? null,
+                    'Num Carport Space' => $propertyData['CarportSpaces'] ?? null,
+                    'Parking Description' => $arrayToString($propertyData['ParkingFeatures'] ?? null),
+                    'Spa' => $propertyData['SpaYN'] ?? null,
+                    'Pool' => $propertyData['MIAMIRE_PoolYN'] ?? null,
+                    'Pool Description' => $arrayToString($propertyData['PoolFeatures'] ?? null),
+                    'Front Exposure' => $propertyData['DirectionFaces'] ?? null,
+                    'Approximate LotSize' => $propertyData['LotSizeSquareFeet'] ?? null,
+                    'Property Sqft' => $propertyData['LotSizeSquareFeet'] ?? null,
+                    'Lot Description' => $arrayToString($propertyData['LotFeatures'] ?? null),
+                    'Pool Dimensions' => $propertyData['MIAMIRE_PoolDimensions'] ?? null,
+                    'Design' => $arrayToString($propertyData['ArchitecturalStyle'] ?? null),
+                    'Design Description' => $arrayToString($propertyData['ArchitecturalStyle'] ?? null),
+                    'Construction' => $arrayToString($propertyData['ConstructionMaterials'] ?? null),
+                    'Roof Description' => $arrayToString($propertyData['Roof'] ?? null),
+                    'Flooring' => $arrayToString($propertyData['Flooring'] ?? null),
+                    'Floor Description' => $arrayToString($propertyData['Flooring'] ?? null)
+                ],
+
+                'Financial_Information' => [
+                    'Type of Association' => $arrayToString($propertyData['MIAMIRE_TypeofAssociation'] ?? null),
+                    'Assoc fee paid per' => $propertyData['AssociationFeeFrequency'] ?? null,
+                    'Tax Year' => $propertyData['TaxYear'] ?? null,
+                    'Tax Information' => $propertyData['TaxLegalDescription'] ?? null
+                ],
+
+                'Agent_Info' => [
+                    'Full Name' => $propertyData['ListAgentFullName'] ?? null,
+                    'Office Name' => $propertyData['ListOfficeName'] ?? null
+                ],
+
+                'Room_Information' => [
+                    'Room Description' => null,
+                    'Bedroom Description' => $arrayToString($propertyData['RoomBedroomFeatures'] ?? null),
+                    'Master Bathroom Description:' => $arrayToString($propertyData['RoomMasterBathroomFeatures'] ?? null),
+                    'Master Bath Features' => $arrayToString($propertyData['RoomMasterBathroomFeatures'] ?? null),
+                    'Dining Description' => $arrayToString($propertyData['RoomDiningRoomFeatures'] ?? null)
+                ],
+
+                'Additional_Property_Information' => [
+                    'Heating Description' => $arrayToString($propertyData['Heating'] ?? null),
+                    'Cooling Description' => $arrayToString($propertyData['Cooling'] ?? null),
+                    'Water Description' => $arrayToString($propertyData['WaterSource'] ?? null),
+                    'Sewer Description' => $arrayToString($propertyData['Sewer'] ?? null),
+                    'Pets Allowed' => $propertyData['MIAMIRE_PetsAllowedYN'] ?? null,
+                    'Guest House Description' => $arrayToString($propertyData['MIAMIRE_GuestHouseDescription'] ?? null),
+                    'Furnished' => $propertyData['Furnished'] ?? null,
+                    'Interior Features' => $arrayToString($propertyData['InteriorFeatures'] ?? null),
+                    'Equipment Appliances' => $arrayToString($propertyData['Appliances'] ?? null),
+                    'Window Treatment' => $arrayToString($propertyData['WindowFeatures'] ?? null),
+                    'Exterior Features' => $arrayToString($propertyData['ExteriorFeatures'] ?? null),
+                    'Subdivision Information' => $arrayToString($propertyData['MIAMIRE_SubdivisionInformation'] ?? null)
+                ]
+            ];
+
+            // Log the successful mapping for debugging
+            Log::info('Successfully mapped property data for listing ID: ' . $listingId);
+
+            return response()->json([
+                'success' => true,
+                'property' => $formattedProperty
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Exception when fetching property from Bridge API', [
+                'listing_id' => $listingId,
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while fetching the property: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
 
 
     /**
@@ -3689,236 +3324,4 @@ class PropertyController extends Controller
             ], 500);
         }
     }
-
-    /**
-     * Get nearby properties using local database
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    // public function getNearbyProperties(Request $request)
-    // {
-    //     // Validate request parameters
-    //     $request->validate([
-    //         'latitude' => 'required|numeric',
-    //         'longitude' => 'required|numeric',
-    //         'radius' => 'nullable|numeric|min:0.1|max:50',
-    //         'limit' => 'nullable|integer|min:1|max:50',
-    //         'property_type' => 'nullable|string',
-    //         'min_price' => 'nullable|numeric',
-    //         'max_price' => 'nullable|numeric',
-    //     ]);
-
-    //     $latitude = $request->input('latitude');
-    //     $longitude = $request->input('longitude');
-    //     $radius = $request->input('radius', 5); // Default 5 miles
-    //     $limit = $request->input('limit', 12); // Default 12 properties
-
-    //     // Convert miles to degrees (approximate conversion)
-    //     // 1 degree of latitude is approximately 69 miles
-    //     // 1 degree of longitude varies based on latitude, but we'll use a simplified approach
-    //     $latRadius = $radius / 69;
-    //     $longRadius = $radius / (69 * cos(deg2rad($latitude)));
-
-    //     // Query properties within the radius
-    //     $query = BridgeProperty::with(['media'])
-    //         ->whereBetween('latitude', [$latitude - $latRadius, $latitude + $latRadius])
-    //         ->whereBetween('longitude', [$longitude - $longRadius, $longitude + $longRadius]);
-
-    //     // Add optional filters
-    //     if ($request->filled('property_type')) {
-    //         $query->where('property_type', $request->input('property_type'));
-    //     }
-
-    //     if ($request->filled('min_price')) {
-    //         $query->where('list_price', '>=', $request->input('min_price'));
-    //     }
-
-    //     if ($request->filled('max_price')) {
-    //         $query->where('list_price', '<=', $request->input('max_price'));
-    //     }
-
-    //     // Calculate distance and add it to the query
-    //     // Using Haversine formula to calculate distance
-    //     $haversine = "(
-    //     6371 * acos(
-    //         cos(radians($latitude)) 
-    //         * cos(radians(latitude)) 
-    //         * cos(radians(longitude) - radians($longitude)) 
-    //         + sin(radians($latitude)) 
-    //         * sin(radians(latitude))
-    //     )
-    // )";
-
-    //     // Add the distance calculation to the query
-    //     $query->selectRaw("*, $haversine AS distance");
-
-    //     // Filter by distance (convert miles to km - 1 mile = 1.60934 km)
-    //     $radiusKm = $radius * 1.60934;
-    //     $query->whereRaw("$haversine < ?", [$radiusKm]);
-
-    //     // Order by distance
-    //     $query->orderBy('distance', 'asc');
-
-    //     // Apply limit
-    //     $properties = $query->limit($limit)->get();
-
-    //     // Format the response
-    //     $formattedProperties = $properties->map(function ($property) {
-    //         return [
-    //             'id' => $property->id,
-    //             'listing_id' => $property->listing_id,
-    //             'listing_key' => $property->listing_key,
-    //             'address' => trim($property->street_number . ' ' . $property->street_name),
-    //             'unit_number' => $property->unit_number,
-    //             'city' => $property->city,
-    //             'state' => $property->state_or_province,
-    //             'postal_code' => $property->postal_code,
-    //             'price' => $property->list_price,
-    //             'bedrooms' => $property->bedrooms_total,
-    //             'bathrooms' => $property->bathrooms_total_decimal,
-    //             'living_area' => $property->living_area,
-    //             'property_type' => $property->property_type,
-    //             'property_sub_type' => $property->property_sub_type,
-    //             'year_built' => $property->year_built,
-    //             'photos' => $property->media->map(function ($media) {
-    //                 return $media->media_url;
-    //             }),
-    //             'distance' => round($property->distance * 0.621371, 2), // Convert km back to miles and round to 2 decimal places
-    //         ];
-    //     });
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'properties' => $formattedProperties,
-    //         'total' => $properties->count(),
-    //     ]);
-    // }
-
-    /**
-     * Get nearby properties using local database with response format matching Bridge API
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    // public function getNearbyProperties(Request $request)
-    // {
-    //     // Validate request parameters
-    //     $request->validate([
-    //         'latitude' => 'required|numeric',
-    //         'longitude' => 'required|numeric',
-    //         'radius' => 'nullable|numeric|min:0.1|max:50',
-    //         'limit' => 'nullable|integer|min:1|max:50',
-    //         'property_type' => 'nullable|string',
-    //         'min_price' => 'nullable|numeric',
-    //         'max_price' => 'nullable|numeric',
-    //     ]);
-
-    //     $latitude = $request->input('latitude');
-    //     $longitude = $request->input('longitude');
-    //     $radius = $request->input('radius', 5); // Default 5 miles
-    //     $limit = $request->input('limit', 12); // Default 12 properties
-
-    //     // Convert miles to degrees (approximate conversion)
-    //     $latRadius = $radius / 69;
-    //     $longRadius = $radius / (69 * cos(deg2rad($latitude)));
-
-    //     // Query properties within the radius
-    //     $query = BridgeProperty::with(['media', 'details'])
-    //         ->whereBetween('latitude', [$latitude - $latRadius, $latitude + $latRadius])
-    //         ->whereBetween('longitude', [$longitude - $longRadius, $longitude + $longRadius]);
-
-    //     // Add optional filters
-    //     if ($request->filled('property_type')) {
-    //         $query->where('property_type', $request->input('property_type'));
-    //     }
-
-    //     if ($request->filled('min_price')) {
-    //         $query->where('list_price', '>=', $request->input('min_price'));
-    //     }
-
-    //     if ($request->filled('max_price')) {
-    //         $query->where('list_price', '<=', $request->input('max_price'));
-    //     }
-
-    //     // Calculate distance using Haversine formula
-    //     $haversine = "(
-    //     6371 * acos(
-    //         cos(radians($latitude)) 
-    //         * cos(radians(latitude)) 
-    //         * cos(radians(longitude) - radians($longitude)) 
-    //         + sin(radians($latitude)) 
-    //         * sin(radians(latitude))
-    //     )
-    //     )";
-
-    //     // Add the distance calculation to the query
-    //     $query->selectRaw("*, $haversine AS distance");
-
-    //     // Filter by distance (convert miles to km - 1 mile = 1.60934 km)
-    //     $radiusKm = $radius * 1.60934;
-    //     $query->whereRaw("$haversine < ?", [$radiusKm]);
-
-    //     // Order by distance
-    //     $query->orderBy('distance', 'asc');
-
-    //     // Apply limit
-    //     $properties = $query->limit($limit)->get();
-
-    //     // Format the response to match Bridge API format
-    //     $formattedProperties = $properties->map(function ($property) {
-    //         // Convert distance from km to miles
-    //         $distanceInMiles = round($property->distance * 0.621371, 2);
-
-    //         // Create a response that matches the Bridge API format
-    //         return [
-    //             // Use the exact field names from Bridge API
-    //             'ListingId' => $property->listing_id,
-    //             'ListingKey' => $property->listing_key,
-    //             'StreetNumber' => $property->street_number,
-    //             'StreetName' => $property->street_name,
-    //             'UnitNumber' => $property->unit_number,
-    //             'City' => $property->city,
-    //             'StateOrProvince' => $property->state_or_province,
-    //             'PostalCode' => $property->postal_code,
-    //             'CountyOrParish' => $property->county_or_parish,
-    //             'ListPrice' => $property->list_price,
-    //             'BedroomsTotal' => $property->bedrooms_total,
-    //             'BathroomsTotalDecimal' => $property->bathrooms_total_decimal,
-    //             'LivingArea' => $property->living_area,
-    //             'LivingAreaUnits' => $property->living_area_units,
-    //             'LotSizeAcres' => $property->lot_size_acres,
-    //             'PropertyType' => $property->property_type,
-    //             'PropertySubType' => $property->property_sub_type,
-    //             'YearBuilt' => $property->year_built,
-    //             'StandardStatus' => $property->standard_status,
-    //             'PublicRemarks' => $property->public_remarks,
-    //             'Latitude' => $property->latitude,
-    //             'Longitude' => $property->longitude,
-
-    //             // Include media in the format Bridge API uses
-    //             'Media' => $property->media->map(function ($media) {
-    //                 return [
-    //                     'MediaURL' => $media->media_url,
-    //                     'MediaType' => $media->media_type,
-    //                     'Order' => $media->order,
-    //                     'Description' => $media->description
-    //                 ];
-    //             }),
-
-    //             // Add the calculated distance
-    //             'distance' => $distanceInMiles,
-
-    //             // Include any additional fields that might be needed
-    //             'id' => $property->id, // Keep your internal ID for reference
-    //         ];
-    //     });
-
-    //     // Structure the response to match Bridge API format
-    //     return response()->json([
-    //         'success' => true,
-    //         'bundle' => $formattedProperties,
-    //         'total' => $properties->count(),
-    //     ]);
-    // }
 }
