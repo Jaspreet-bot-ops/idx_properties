@@ -3200,7 +3200,7 @@ class PropertyController extends Controller
         $propertyData = $response->json();
         
         // If no property was found
-        if (empty($propertyData) || !isset($propertyData['ListingId'])) {
+        if (empty($propertyData)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Property not found with the provided listing ID'
