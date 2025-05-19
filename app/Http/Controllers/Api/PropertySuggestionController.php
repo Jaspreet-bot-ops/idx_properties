@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 
 class PropertySuggestionController extends Controller
@@ -2202,179 +2203,176 @@ public function autocomplete(Request $request)
             'suggestions' => [
                 'addresses' => [],
                 'buildings' => [],
-                'places' => []
+                'places' => [],
             ]
         ]);
     }
 
     $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
+    $directCityUrl = 'https://api.bridgedataoutput.com/api/v2/OData/miamire/Properties';
     $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
-    $fields = 'ListingId,ListingKey,UnparsedAddress,StreetNumber,StreetName,StreetDirPrefix,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice,StandardStatus,BuildingName';
+    $fields = 'ListingId,ListingKey,UnparsedAddress,StreetNumber,StreetName,StreetDirPrefix,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice,StandardStatus,BuildingName,BedroomsTotal,BathroomsTotalDecimal,LivingArea,Media';
 
-    try {
-        // Building query
-        $buildingParams = [
+    // Prepare parameters
+    $sharedParams = [
+        'access_token' => $accessToken,
+        'fields' => $fields,
+        'limit' => $limit,
+    ];
+
+    if ($type === 'buy') {
+        $sharedParams['PropertyType'] = 'Residential';
+        $sharedParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
+    } elseif ($type === 'rent') {
+        $sharedParams['PropertyType'] = 'Residential Lease';
+        $sharedParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
+    }
+
+    // Start concurrent requests
+    $responses = Http::pool(fn ($pool) => [
+        'building' => $pool->as('building')->withOptions(['verify' => false])->get($baseUrl, array_merge($sharedParams, ['BuildingName' => "*{$query}*", 'PropertySubType' => 'Condominium'])),
+        'address' => $pool->as('address')->withOptions(['verify' => false])->get($baseUrl, array_merge($sharedParams, ['UnparsedAddress' => "*{$query}*"])),
+        'city'    => $pool->as('city')->withOptions(['verify' => false])->get($directCityUrl, [
             'access_token' => $accessToken,
-            'BuildingName' => "*{$query}*",
-            'PropertySubType' => 'Condominium',
-            'fields' => $fields,
-            'limit' => $limit
-        ];
-        if ($type === 'buy') {
-            $buildingParams['PropertyType'] = 'Residential';
-            $buildingParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
-        } elseif ($type === 'rent') {
-            $buildingParams['PropertyType'] = 'Residential Lease';
-            $buildingParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
-        }
-        $buildingResponse = Http::get($baseUrl, $buildingParams);
-        $buildingProperties = $buildingResponse->successful() ? $buildingResponse->json()['bundle'] ?? [] : [];
-
-        // Address query
-        $addressParams = [
-            'access_token' => $accessToken,
-            'limit' => $limit,
-            'fields' => $fields,
-            'UnparsedAddress' => "*{$query}*"
-        ];
-        if ($type === 'buy') {
-            $addressParams['PropertyType'] = 'Residential';
-            $addressParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
-        } elseif ($type === 'rent') {
-            $addressParams['PropertyType'] = 'Residential Lease';
-            $addressParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
-        }
-        $addressResponse = Http::get($baseUrl, $addressParams);
-        $addressProperties = $addressResponse->successful() ? $addressResponse->json()['bundle'] ?? [] : [];
-
-        // City query
-        $cityParams = [
-            'access_token' => $accessToken,
-            'limit' => $limit,
-            'fields' => 'City,StateOrProvince',
-            'City' => "*{$query}*",
-            'groupBy' => 'City,StateOrProvince'
-        ];
-        $cityResponse = Http::get($baseUrl, $cityParams);
-        $cityProperties = $cityResponse->successful() ? $cityResponse->json()['bundle'] ?? [] : [];
-
-        // State query
-        $stateParams = [
+            '$filter' => "contains(City,'{$query}')",
+            '$select' => 'City,StateOrProvince',
+            '$top' => 50,
+            '$orderby' => 'City',
+        ]),
+        'state'   => $pool->as('state')->withOptions(['verify' => false])->get($baseUrl, [
             'access_token' => $accessToken,
             'limit' => $limit,
             'fields' => 'StateOrProvince',
             'StateOrProvince' => "*{$query}*",
             'groupBy' => 'StateOrProvince'
-        ];
-        $stateResponse = Http::get($baseUrl, $stateParams);
-        $stateProperties = $stateResponse->successful() ? $stateResponse->json()['bundle'] ?? [] : [];
-
-        // Postal code query
-        $postalParams = [
+        ]),
+        'postal'  => $pool->as('postal')->withOptions(['verify' => false])->get($baseUrl, [
             'access_token' => $accessToken,
             'limit' => $limit,
             'fields' => 'PostalCode,StateOrProvince',
             'PostalCode' => "*{$query}*",
             'groupBy' => 'PostalCode,StateOrProvince'
-        ];
-        $postalResponse = Http::withOptions(['verify' => false])->get($baseUrl, $postalParams);
-        $postalProperties = $postalResponse->successful() ? $postalResponse->json()['bundle'] ?? [] : [];
+        ])
+    ]);
 
-        // Process data
-        $buildingSuggestions = [];
-        foreach ($buildingProperties as $property) {
-            if (!empty($property['BuildingName'])) {
-                $key = strtolower($property['BuildingName'] . '-' . ($property['StreetNumber'] ?? '') . '-' . ($property['StreetName'] ?? ''));
-                if (!isset($buildingSuggestions[$key])) {
-                    $address = trim(($property['StreetNumber'] ?? '') . ' ' . ($property['StreetDirPrefix'] ?? '') . ' ' . ($property['StreetName'] ?? ''));
-                    $buildingSuggestions[$key] = [
-                        'type' => 'building',
-                        'building_name' => $property['BuildingName'],
-                        'address' => $address,
-                        'city' => $property['City'] ?? '',
-                        'state' => $property['StateOrProvince'] ?? '',
-                        'postal_code' => $property['PostalCode'] ?? '',
-                        'property_sub_type' => $property['PropertySubType'] ?? '',
-                        'prices' => [$property['ListPrice'] ?? 0],
-                        'display_text' => $property['BuildingName'] . ', ' . ($property['City'] ?? '') . ', ' . ($property['StateOrProvince'] ?? ''),
-                        'action_url' => "/buildings?street_number={$property['StreetNumber']}&street_name=" . urlencode($property['StreetName'] ?? '')
-                    ];
-                } else {
-                    $buildingSuggestions[$key]['prices'][] = $property['ListPrice'] ?? 0;
-                }
+    $buildingProperties = $responses['building']->successful() ? $responses['building']->json('bundle', []) : [];
+    $addressProperties  = $responses['address']->successful() ? $responses['address']->json('bundle', []) : [];
+    $cityResults        = $responses['city']->successful() ? $responses['city']->json('value', []) : [];
+    $stateProperties    = $responses['state']->successful() ? $responses['state']->json('bundle', []) : [];
+    $postalProperties   = $responses['postal']->successful() ? $responses['postal']->json('bundle', []) : [];
+
+    // Helper for image
+    $extractImage = function ($media) {
+        foreach ($media ?? [] as $item) {
+            if (($item['MediaCategory'] ?? '') === 'Image' && !empty($item['MediaURL'])) {
+                return $item['MediaURL'];
             }
         }
+        return null;
+    };
 
-        $addressSuggestions = [];
-        foreach ($addressProperties as $property) {
-            if (!empty($property['UnparsedAddress'])) {
-                $addressSuggestions[] = [
-                    'type' => 'address',
-                    'address' => $property['UnparsedAddress'],
-                    'city' => $property['City'] ?? '',
-                    'state' => $property['StateOrProvince'] ?? '',
-                    'postal_code' => $property['PostalCode'] ?? '',
-                    'display_text' => $property['UnparsedAddress'],
-                    'action_url' => "/properties/search?address=" . urlencode($property['UnparsedAddress'])
-                ];
+    // BUILDING SUGGESTIONS
+    $buildingSuggestions = [];
+    foreach ($buildingProperties as $property) {
+        $name = $property['BuildingName'] ?? '';
+        if (!$name) continue;
+
+        $key = strtolower($name . '-' . ($property['StreetNumber'] ?? '') . '-' . ($property['StreetName'] ?? ''));
+        $image = $extractImage($property['Media'] ?? []);
+
+        if (!isset($buildingSuggestions[$key])) {
+            $address = trim(($property['StreetNumber'] ?? '') . ' ' . ($property['StreetDirPrefix'] ?? '') . ' ' . ($property['StreetName'] ?? ''));
+            $buildingSuggestions[$key] = [
+                'type' => 'building',
+                'building_name' => $name,
+                'address' => $address,
+                'city' => $property['City'] ?? '',
+                'state' => $property['StateOrProvince'] ?? '',
+                'postal_code' => $property['PostalCode'] ?? '',
+                'image_url' => $image,
+                'prices' => [$property['ListPrice'] ?? 0],
+                'min_price' => $property['ListPrice'] ?? 0,
+                'max_price' => $property['ListPrice'] ?? 0,
+                'display_text' => "{$name}, {$property['City']}, {$property['StateOrProvince']}",
+                'action_url' => "/buildings?street_number={$property['StreetNumber']}&street_name=" . urlencode($property['StreetName'] ?? '')
+            ];
+        } else {
+            $price = $property['ListPrice'] ?? 0;
+            $suggestion = &$buildingSuggestions[$key];
+            $suggestion['prices'][] = $price;
+            if ($price > 0) {
+                $suggestion['min_price'] = min($suggestion['min_price'], $price);
+                $suggestion['max_price'] = max($suggestion['max_price'], $price);
             }
         }
-
-        $placeSuggestions = [];
-
-        foreach ($cityProperties as $c) {
-            if (!empty($c['City'])) {
-                $placeSuggestions[] = [
-                    'type' => 'place',
-                    'place_type' => 'city',
-                    'name' => $c['City'],
-                    'state' => $c['StateOrProvince'] ?? '',
-                    'display_text' => $c['City'] . ', ' . ($c['StateOrProvince'] ?? ''),
-                    'action_url' => "/properties/search?city=" . urlencode($c['City'])
-                ];
-            }
-        }
-
-        foreach ($stateProperties as $s) {
-            if (!empty($s['StateOrProvince'])) {
-                $placeSuggestions[] = [
-                    'type' => 'place',
-                    'place_type' => 'state',
-                    'name' => $s['StateOrProvince'],
-                    'display_text' => $s['StateOrProvince'],
-                    'action_url' => "/properties/search?state=" . urlencode($s['StateOrProvince'])
-                ];
-            }
-        }
-
-        foreach ($postalProperties as $p) {
-            if (!empty($p['PostalCode'])) {
-                $placeSuggestions[] = [
-                    'type' => 'place',
-                    'place_type' => 'postal_code',
-                    'name' => $p['PostalCode'],
-                    'display_text' => $p['PostalCode'] . ', ' . ($p['StateOrProvince'] ?? ''),
-                    'action_url' => "/properties/search?postalCode=" . urlencode($p['PostalCode'])
-                ];
-            }
-        }
-
-        return response()->json([
-            'suggestions' => [
-                'addresses' => array_values($addressSuggestions),
-                'buildings' => array_values($buildingSuggestions),
-                'places' => $placeSuggestions
-            ]
-        ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => 'Autocomplete failed: ' . $e->getMessage()
-        ], 500);
     }
+
+    // ADDRESS SUGGESTIONS
+    $addressSuggestions = collect($addressProperties)->map(function ($property) use ($extractImage) {
+        return [
+            'type' => 'address',
+            'address' => $property['UnparsedAddress'],
+            'city' => $property['City'] ?? '',
+            'state' => $property['StateOrProvince'] ?? '',
+            'postal_code' => $property['PostalCode'] ?? '',
+            'price' => $property['ListPrice'] ?? null,
+            'image_url' => $extractImage($property['Media'] ?? []),
+            'display_text' => $property['UnparsedAddress'],
+            'action_url' => "/properties/search?address=" . urlencode($property['UnparsedAddress']),
+        ];
+    })->filter()->values();
+
+    // PLACE SUGGESTIONS
+    $seenCities = [];
+    $placeSuggestions = [];
+
+    foreach ($cityResults as $city) {
+        if (!empty($city['City']) && !in_array($city['City'], $seenCities)) {
+            $seenCities[] = $city['City'];
+            $placeSuggestions[] = [
+                'type' => 'place',
+                'place_type' => 'city',
+                'name' => $city['City'],
+                'state' => $city['StateOrProvince'] ?? '',
+                'display_text' => "{$city['City']}, {$city['StateOrProvince']}",
+                'action_url' => "/properties/search?city=" . urlencode($city['City']),
+            ];
+        }
+    }
+
+    foreach ($stateProperties as $state) {
+        if (!empty($state['StateOrProvince'])) {
+            $placeSuggestions[] = [
+                'type' => 'place',
+                'place_type' => 'state',
+                'name' => $state['StateOrProvince'],
+                'display_text' => $state['StateOrProvince'],
+                'action_url' => "/properties/search?state=" . urlencode($state['StateOrProvince']),
+            ];
+        }
+    }
+
+    foreach ($postalProperties as $postal) {
+        if (!empty($postal['PostalCode'])) {
+            $placeSuggestions[] = [
+                'type' => 'place',
+                'place_type' => 'postal',
+                'name' => $postal['PostalCode'],
+                'state' => $postal['StateOrProvince'] ?? '',
+                'display_text' => "{$postal['PostalCode']}, {$postal['StateOrProvince']}",
+                'action_url' => "/properties/search?postal_code=" . urlencode($postal['PostalCode']),
+            ];
+        }
+    }
+
+    return response()->json([
+        'suggestions' => [
+            'addresses' => array_values($addressSuggestions->take($limit)->toArray()),
+            'buildings' => array_values($buildingSuggestions),
+            'places'    => array_slice($placeSuggestions, 0, $limit),
+        ]
+    ]);
 }
-
-
 
 
 
