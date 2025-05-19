@@ -1497,384 +1497,706 @@ class PropertySuggestionController extends Controller
     //     });
     // }
 
-//     public function autocomplete(Request $request)
-//     {
-//         // Get search parameters - support both 'q' and 'query' parameters
-//         $query = $request->input('q') ?? $request->input('query');
-//         $type = $request->input('type'); // 'buy' or 'rent'
-//         $limit = $request->input('limit', 5); // Default 15 suggestions total
-    
-//         // Validate query parameter
-//         if (empty($query) || strlen($query) < 1) {
-//             return response()->json([
-//                 'suggestions' => [
-//                     'addresses' => [],
-//                     'buildings' => [],
-//                     'places' => []
-//                 ]
-//             ]);
-//         }
-    
-//         // Allocate limits for each category
-//         $addressLimit = ceil($limit * 0.4); // 40% for addresses
-//         $buildingLimit = ceil($limit * 0.3); // 30% for buildings
-//         $placeLimit = ceil($limit * 0.3); // 30% for places
-    
-//         // Base API URL and access token
-//         $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
-//         $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
-    
-//         try {
-//             // 1. ADDRESS SUGGESTIONS - Individual property addresses
-//             $addressSuggestions = $this->fetchAddressSuggestions($baseUrl, $accessToken, $query, $type, $addressLimit);
-            
-//             // 2. BUILDING SUGGESTIONS
-//             $buildingSuggestions = $this->fetchBuildingSuggestions($baseUrl, $accessToken, $query, $type, $buildingLimit);
-            
-//             // 3. PLACE SUGGESTIONS (Cities, States, Postal Codes)
-//             $placeSuggestions = $this->fetchPlaceSuggestions($baseUrl, $accessToken, $query, $placeLimit);
-    
-//             // Combine all suggestions
-//             $allSuggestions = collect([])
-//                 ->concat($addressSuggestions)
-//                 ->concat($buildingSuggestions)
-//                 ->concat($placeSuggestions)
-//                 ->sortBy(function ($item) use ($query) {
-//                     // Sort by relevance - items that start with the query should come first
-//                     $searchableText = '';
-//                     if ($item['type'] === 'address') {
-//                         $searchableText = $item['address'];
-//                     } else if ($item['type'] === 'building') {
-//                         $searchableText = $item['building_name'] ?? $item['address'];
-//                     } else if ($item['type'] === 'place') {
-//                         $searchableText = $item['name'];
-//                     }
-                    
-//                     if (stripos($searchableText, $query) === 0) {
-//                         return 0; // Highest priority if text starts with query
-//                     } else if (stripos($searchableText, $query) !== false) {
-//                         return 1; // Medium priority if text contains query
-//                     } else {
-//                         return 2; // Lowest priority for other matches
-//                     }
-//                 })
-//                 ->values()
-//                 ->take($limit);
-    
-//             // Group suggestions by type
-//             $groupedSuggestions = [
-//                 'addresses' => $allSuggestions->where('type', 'address')->values(),
-//                 'buildings' => $allSuggestions->where('type', 'building')->values(),
-//                 'places' => $allSuggestions->where('type', 'place')->values()
-//             ];
-    
-//             return response()->json(['suggestions' => $groupedSuggestions]);
-            
-//         } catch (\Exception $e) {
-//             Log::error('Exception when fetching autocomplete suggestions from Bridge API', [
-//                 'exception' => $e->getMessage(),
-//                 'query' => $query
-//             ]);
-            
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'An error occurred while fetching suggestions',
-//                 'suggestions' => [
-//                     'addresses' => [],
-//                     'buildings' => [],
-//                     'places' => []
-//                 ]
-//             ], 500);
-//         }
-//     }
+    //     public function autocomplete(Request $request)
+    //     {
+    //         // Get search parameters - support both 'q' and 'query' parameters
+    //         $query = $request->input('q') ?? $request->input('query');
+    //         $type = $request->input('type'); // 'buy' or 'rent'
+    //         $limit = $request->input('limit', 5); // Default 15 suggestions total
 
-//     private function fetchAddressSuggestions($baseUrl, $accessToken, $query, $type, $limit)
-//     {
-//         // Define property types that are typically individual properties
-//         $individualPropertyTypes = ['Land', 'SingleFamilyResidence', 'Business', 'BusinessOpportunity', 'UnimprovedLand', 'Special Purpose'];
-        
-//         $queryParams = [
-//             'access_token' => $accessToken,
-//             'limit' => $limit,
-//             'fields' => 'ListingId,ListingKey,StreetNumber,StreetName,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,StandardStatus,UnparsedAddress',
-//             'order' => 'ListPrice asc'
-//         ];
-        
-//         // Add search conditions
-//         $queryParams['q'] = "UnparsedAddress eq '{$query}*' OR UnparsedAddress like '*{$query}*' OR StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*' OR StateOrProvince like '*{$query}*'";
-        
-//         // Apply type filter if
-//         if ($type) {
-//             if (strtolower($type) === 'buy') {
-//                 $queryParams['PropertyType'] != 'Residential Lease';
-//                 // $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
-//             } elseif (strtolower($type) === 'rent') {
-//                 $queryParams['PropertyType'] = 'Residential Lease';
-//                 // $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
-//             }
-//         }
-        
-//         // Exclude building-type properties
-//         // $queryParams['PropertySubType.ne'] = implode(',', $individualPropertyTypes);
-        
-//         $response = Http::get($baseUrl, $queryParams);
-        
-//         if (!$response->successful()) {
-//             Log::error('Bridge API request failed for address suggestions', [
-//                 'status' => $response->status(),
-//                 'response' => $response->json()
-//             ]);
-//             return collect([]);
-//         }
-        
-//         $data = $response->json();
-//         $properties = $data['bundle'] ?? [];
-        
-//         return collect($properties)->map(function ($item) {
-//             $address = trim($item['StreetNumber'] . ' ' . $item['StreetName']);
-//             if (!empty($item['UnitNumber'])) {
-//                 $address .= ' #' . $item['UnitNumber'];
-//             }
-            
-//             return [
-//                 'type' => 'address',
-//                 'id' => $item['ListingId'],
-//                 'listing_key' => $item['ListingKey'],
-//                 'address' => $address,
-//                 'city' => $item['City'],
-//                 'state' => $item['StateOrProvince'],
-//                 'postal_code' => $item['PostalCode'],
-//                 'property_type' => $item['PropertySubType'],
-//                 'price' => $item['ListPrice'],
-//                 'status' => $item['StandardStatus'],
-//                 'display_text' => $address . 
-//                     ($item['City'] ? ', ' . $item['City'] : '') . 
-//                     ($item['StateOrProvince'] ? ', ' . $item['StateOrProvince'] : ''),
-//                 'action_url' => "/api/properties/{$item['ListingId']}"
-//             ];
-//         });
-//     }
-    
-//     private function fetchBuildingSuggestions($baseUrl, $accessToken, $query, $type, $limit)
-//     {
-//         // For buildings, we need to make a more complex query to group properties by address
-//         $queryParams = [
-//             'access_token' => $accessToken,
-//             'limit' => max(1, $limit * 2), // Ensure limit is positive and get extra to filter
-//             'fields' => 'ListingId,StreetNumber,StreetName,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,BuildingName',
-//             'groupBy' => 'StreetNumber,StreetName,City'
-//             // Remove the aggregations parameter
-//         ];
-        
-//         // Add search conditions
-//         $queryParams['q'] = "BuildingName like '*{$query}*' OR StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*' OR CONCAT(StreetNumber,' ',StreetName) like '*{$query}*'";
-        
-//         // Apply type filter if provided
-//         if ($type) {
-//             if (strtolower($type) === 'buy') {
-//                 $queryParams['PropertyType.ne'] = 'Residential Lease'; // Fixed assignment operator
-//             } elseif (strtolower($type) === 'rent') {
-//                 $queryParams['PropertyType'] = 'Residential Lease';
-//             }
-//         }
-        
-//         $response = Http::get($baseUrl, $queryParams);
-        
-//         if (!$response->successful()) {
-//             Log::error('Bridge API request failed for building suggestions', [
-//                 'status' => $response->status(),
-//                 'response' => $response->json()
-//             ]);
-//             return collect([]);
-//         }
-        
-//         $data = $response->json();
-//         $buildings = $data['bundle'] ?? [];
-        
-//         // Process the buildings - we'll need to manually calculate counts and prices
-//         $buildingGroups = collect($buildings)->groupBy(function($item) {
-//             return $item['StreetNumber'] . '-' . $item['StreetName'] . '-' . $item['City'];
-//         });
-        
-//         // Only keep groups with multiple units (buildings)
-//         $buildingGroups = $buildingGroups->filter(function($group) {
-//             return $group->count() > 1;
-//         });
-        
-//         // Map the building groups to the expected format
-//         return $buildingGroups->take($limit)->map(function($group, $key) {
-//             $firstItem = $group->first();
-            
-//             $address = trim($firstItem['StreetNumber'] . ' ' . 
-//                 ($firstItem['StreetDirPrefix'] ? $firstItem['StreetDirPrefix'] . ' ' : '') . 
-//                 $firstItem['StreetName']);
-                
-//             $buildingName = !empty($firstItem['BuildingName']) ? $firstItem['BuildingName'] : $address;
-            
-//             // Calculate min and max prices
-//             $prices = $group->pluck('ListPrice')->filter()->values();
-//             $minPrice = $prices->min();
-//             $maxPrice = $prices->max();
-            
-//             return [
-//                 'type' => 'building',
-//                 'building_name' => $buildingName,
-//                 'street_number' => $firstItem['StreetNumber'],
-//                 'street_dir_prefix' => $firstItem['StreetDirPrefix'],
-//                 'street_name' => $firstItem['StreetName'],
-//                 'address' => $address,
-//                 'city' => $firstItem['City'],
-//                 'state' => $firstItem['StateOrProvince'],
-//                 'postal_code' => $firstItem['PostalCode'],
-//                 'property_sub_type' => $firstItem['PropertySubType'],
-//                 'unit_count' => $group->count(),
-//                 'min_price' => $minPrice,
-//                 'max_price' => $maxPrice,
-//                 'display_text' => $buildingName . 
-//                     ($firstItem['City'] ? ', ' . $firstItem['City'] : '') . 
-//                     ($firstItem['StateOrProvince'] ? ', ' . $firstItem['StateOrProvince'] : '') . 
-//                     ' (' . $group->count() . ' units)',
-//                 'action_url' => "/api/buildings?street_number={$firstItem['StreetNumber']}&street_name=" . urlencode($firstItem['StreetName'])
-//             ];
-//         })->values();
-//     }
-    
-    
-//     private function fetchPlaceSuggestions($baseUrl, $accessToken, $query, $limit)
-//     {
-//         // We'll make three separate requests for cities, states, and postal codes
-//         $cityLimit = ceil($limit / 3);
-//         $stateLimit = ceil($limit / 3);
-//         $postalCodeLimit = $limit - $cityLimit - $stateLimit;
-        
-//         // 1. City suggestions
-//         $citySuggestions = $this->fetchCitySuggestions($baseUrl, $accessToken, $query, $cityLimit);
-        
-//         // 2. State suggestions
-//         $stateSuggestions = $this->fetchStateSuggestions($baseUrl, $accessToken, $query, $stateLimit);
-        
-//         // 3. Postal code suggestions
-//         $postalCodeSuggestions = $this->fetchPostalCodeSuggestions($baseUrl, $accessToken, $query, $postalCodeLimit);
-        
-//         // Combine all place suggestions
-//         return $citySuggestions->concat($stateSuggestions)->concat($postalCodeSuggestions);
-//     }
-    
+    //         // Validate query parameter
+    //         if (empty($query) || strlen($query) < 1) {
+    //             return response()->json([
+    //                 'suggestions' => [
+    //                     'addresses' => [],
+    //                     'buildings' => [],
+    //                     'places' => []
+    //                 ]
+    //             ]);
+    //         }
 
-//     private function fetchCitySuggestions($baseUrl, $accessToken, $query, $limit)
-//     {
-//         $queryParams = [
-//             'access_token' => $accessToken,
-//             'limit' => $limit,
-//             'fields' => 'City,StateOrProvince',
-//             'groupBy' => 'City,StateOrProvince',
-//             'q' => "City like '*{$query}*'"
-//         ];
-        
-//         $response = Http::get($baseUrl, $queryParams);
-        
-//         if (!$response->successful()) {
-//             Log::error('Bridge API request failed for city suggestions', [
-//                 'status' => $response->status(),
-//                 'response' => $response->json()
-//             ]);
-//             return collect([]);
-//         }
-        
-//         $data = $response->json();
-//         $cities = $data['bundle'] ?? [];
-        
-//         return collect($cities)->map(function ($item) {
-//             return [
-//                 'type' => 'place',
-//                 'place_type' => 'city',
-//                 'name' => $item['City'],
-//                 'state' => $item['StateOrProvince'],
-//                 'display_text' => $item['City'] . ($item['StateOrProvince'] ? ', ' . $item['StateOrProvince'] : ''),
-//                 'action_url' => "/api/properties/search?city=" . urlencode($item['City'])
-//             ];
-//         });
-//     }
+    //         // Allocate limits for each category
+    //         $addressLimit = ceil($limit * 0.4); // 40% for addresses
+    //         $buildingLimit = ceil($limit * 0.3); // 30% for buildings
+    //         $placeLimit = ceil($limit * 0.3); // 30% for places
 
-// private function fetchStateSuggestions($baseUrl, $accessToken, $query, $limit)
-// {
-//     $queryParams = [
-//         'access_token' => $accessToken,
-//         'limit' => $limit,
-//         'fields' => 'StateOrProvince',
-//         'groupBy' => 'StateOrProvince',
-//         'q' => "StateOrProvince like '*{$query}*'"
-//     ];
-    
-//     $response = Http::get($baseUrl, $queryParams);
-    
-//     if (!$response->successful()) {
-//         Log::error('Bridge API request failed for state suggestions', [
-//             'status' => $response->status(),
-//             'response' => $response->json()
-//         ]);
-//         return collect([]);
-//     }
-    
-//     $data = $response->json();
-//     $states = $data['bundle'] ?? [];
-    
-//     return collect($states)->map(function ($item) {
-//         $fullStateName = $this->getFullStateName($item['StateOrProvince']);
-//         return [
-//             'type' => 'place',
-//             'place_type' => 'state',
-//             'name' => $fullStateName,
-//             'code' => $item['StateOrProvince'],
-//             'display_text' => $fullStateName,
-//             'action_url' => "/api/properties/search?state=" . urlencode($item['StateOrProvince'])
-//         ];
-//     });
-// }
+    //         // Base API URL and access token
+    //         $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
+    //         $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
 
-// private function fetchPostalCodeSuggestions($baseUrl, $accessToken, $query, $limit)
-// {
-//     $queryParams = [
-//         'access_token' => $accessToken,
-//         'limit' => $limit,
-//         'fields' => 'PostalCode,StateOrProvince',
-//         'groupBy' => 'PostalCode,StateOrProvince',
-//         'q' => "PostalCode like '*{$query}*'"
-//     ];
-    
-//     $response = Http::get($baseUrl, $queryParams);
-    
-//     if (!$response->successful()) {
-//         Log::error('Bridge API request failed for postal code suggestions', [
-//             'status' => $response->status(),
-//             'response' => $response->json()
-//         ]);
-//         return collect([]);
-//     }
-    
-//     $data = $response->json();
-//     $postalCodes = $data['bundle'] ?? [];
-    
-//     return collect($postalCodes)->map(function ($item) {
-//         return [
-//             'type' => 'place',
-//             'place_type' => 'postal_code',
-//             'name' => $item['PostalCode'],
-//             'display_text' => $item['PostalCode'] . ($item['StateOrProvince'] ? ', ' . $item['StateOrProvince'] : ''),
-//             'action_url' => "/api/properties/search?postalCode=" . $item['PostalCode']
-//         ];
-//     });
-// }
+    //         try {
+    //             // 1. ADDRESS SUGGESTIONS - Individual property addresses
+    //             $addressSuggestions = $this->fetchAddressSuggestions($baseUrl, $accessToken, $query, $type, $addressLimit);
 
+    //             // 2. BUILDING SUGGESTIONS
+    //             $buildingSuggestions = $this->fetchBuildingSuggestions($baseUrl, $accessToken, $query, $type, $buildingLimit);
+
+    //             // 3. PLACE SUGGESTIONS (Cities, States, Postal Codes)
+    //             $placeSuggestions = $this->fetchPlaceSuggestions($baseUrl, $accessToken, $query, $placeLimit);
+
+    //             // Combine all suggestions
+    //             $allSuggestions = collect([])
+    //                 ->concat($addressSuggestions)
+    //                 ->concat($buildingSuggestions)
+    //                 ->concat($placeSuggestions)
+    //                 ->sortBy(function ($item) use ($query) {
+    //                     // Sort by relevance - items that start with the query should come first
+    //                     $searchableText = '';
+    //                     if ($item['type'] === 'address') {
+    //                         $searchableText = $item['address'];
+    //                     } else if ($item['type'] === 'building') {
+    //                         $searchableText = $item['building_name'] ?? $item['address'];
+    //                     } else if ($item['type'] === 'place') {
+    //                         $searchableText = $item['name'];
+    //                     }
+
+    //                     if (stripos($searchableText, $query) === 0) {
+    //                         return 0; // Highest priority if text starts with query
+    //                     } else if (stripos($searchableText, $query) !== false) {
+    //                         return 1; // Medium priority if text contains query
+    //                     } else {
+    //                         return 2; // Lowest priority for other matches
+    //                     }
+    //                 })
+    //                 ->values()
+    //                 ->take($limit);
+
+    //             // Group suggestions by type
+    //             $groupedSuggestions = [
+    //                 'addresses' => $allSuggestions->where('type', 'address')->values(),
+    //                 'buildings' => $allSuggestions->where('type', 'building')->values(),
+    //                 'places' => $allSuggestions->where('type', 'place')->values()
+    //             ];
+
+    //             return response()->json(['suggestions' => $groupedSuggestions]);
+
+    //         } catch (\Exception $e) {
+    //             Log::error('Exception when fetching autocomplete suggestions from Bridge API', [
+    //                 'exception' => $e->getMessage(),
+    //                 'query' => $query
+    //             ]);
+
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'An error occurred while fetching suggestions',
+    //                 'suggestions' => [
+    //                     'addresses' => [],
+    //                     'buildings' => [],
+    //                     'places' => []
+    //                 ]
+    //             ], 500);
+    //         }
+    //     }
+
+    //     private function fetchAddressSuggestions($baseUrl, $accessToken, $query, $type, $limit)
+    //     {
+    //         // Define property types that are typically individual properties
+    //         $individualPropertyTypes = ['Land', 'SingleFamilyResidence', 'Business', 'BusinessOpportunity', 'UnimprovedLand', 'Special Purpose'];
+
+    //         $queryParams = [
+    //             'access_token' => $accessToken,
+    //             'limit' => $limit,
+    //             'fields' => 'ListingId,ListingKey,StreetNumber,StreetName,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,StandardStatus,UnparsedAddress',
+    //             'order' => 'ListPrice asc'
+    //         ];
+
+    //         // Add search conditions
+    //         $queryParams['q'] = "UnparsedAddress eq '{$query}*' OR UnparsedAddress like '*{$query}*' OR StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*' OR StateOrProvince like '*{$query}*'";
+
+    //         // Apply type filter if
+    //         if ($type) {
+    //             if (strtolower($type) === 'buy') {
+    //                 $queryParams['PropertyType'] != 'Residential Lease';
+    //                 // $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
+    //             } elseif (strtolower($type) === 'rent') {
+    //                 $queryParams['PropertyType'] = 'Residential Lease';
+    //                 // $queryParams['StandardStatus'] = 'Active,Pending,Active Under Contract';
+    //             }
+    //         }
+
+    //         // Exclude building-type properties
+    //         // $queryParams['PropertySubType.ne'] = implode(',', $individualPropertyTypes);
+
+    //         $response = Http::get($baseUrl, $queryParams);
+
+    //         if (!$response->successful()) {
+    //             Log::error('Bridge API request failed for address suggestions', [
+    //                 'status' => $response->status(),
+    //                 'response' => $response->json()
+    //             ]);
+    //             return collect([]);
+    //         }
+
+    //         $data = $response->json();
+    //         $properties = $data['bundle'] ?? [];
+
+    //         return collect($properties)->map(function ($item) {
+    //             $address = trim($item['StreetNumber'] . ' ' . $item['StreetName']);
+    //             if (!empty($item['UnitNumber'])) {
+    //                 $address .= ' #' . $item['UnitNumber'];
+    //             }
+
+    //             return [
+    //                 'type' => 'address',
+    //                 'id' => $item['ListingId'],
+    //                 'listing_key' => $item['ListingKey'],
+    //                 'address' => $address,
+    //                 'city' => $item['City'],
+    //                 'state' => $item['StateOrProvince'],
+    //                 'postal_code' => $item['PostalCode'],
+    //                 'property_type' => $item['PropertySubType'],
+    //                 'price' => $item['ListPrice'],
+    //                 'status' => $item['StandardStatus'],
+    //                 'display_text' => $address . 
+    //                     ($item['City'] ? ', ' . $item['City'] : '') . 
+    //                     ($item['StateOrProvince'] ? ', ' . $item['StateOrProvince'] : ''),
+    //                 'action_url' => "/api/properties/{$item['ListingId']}"
+    //             ];
+    //         });
+    //     }
+
+    //     private function fetchBuildingSuggestions($baseUrl, $accessToken, $query, $type, $limit)
+    //     {
+    //         // For buildings, we need to make a more complex query to group properties by address
+    //         $queryParams = [
+    //             'access_token' => $accessToken,
+    //             'limit' => max(1, $limit * 2), // Ensure limit is positive and get extra to filter
+    //             'fields' => 'ListingId,StreetNumber,StreetName,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,BuildingName',
+    //             'groupBy' => 'StreetNumber,StreetName,City'
+    //             // Remove the aggregations parameter
+    //         ];
+
+    //         // Add search conditions
+    //         $queryParams['q'] = "BuildingName like '*{$query}*' OR StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*' OR CONCAT(StreetNumber,' ',StreetName) like '*{$query}*'";
+
+    //         // Apply type filter if provided
+    //         if ($type) {
+    //             if (strtolower($type) === 'buy') {
+    //                 $queryParams['PropertyType.ne'] = 'Residential Lease'; // Fixed assignment operator
+    //             } elseif (strtolower($type) === 'rent') {
+    //                 $queryParams['PropertyType'] = 'Residential Lease';
+    //             }
+    //         }
+
+    //         $response = Http::get($baseUrl, $queryParams);
+
+    //         if (!$response->successful()) {
+    //             Log::error('Bridge API request failed for building suggestions', [
+    //                 'status' => $response->status(),
+    //                 'response' => $response->json()
+    //             ]);
+    //             return collect([]);
+    //         }
+
+    //         $data = $response->json();
+    //         $buildings = $data['bundle'] ?? [];
+
+    //         // Process the buildings - we'll need to manually calculate counts and prices
+    //         $buildingGroups = collect($buildings)->groupBy(function($item) {
+    //             return $item['StreetNumber'] . '-' . $item['StreetName'] . '-' . $item['City'];
+    //         });
+
+    //         // Only keep groups with multiple units (buildings)
+    //         $buildingGroups = $buildingGroups->filter(function($group) {
+    //             return $group->count() > 1;
+    //         });
+
+    //         // Map the building groups to the expected format
+    //         return $buildingGroups->take($limit)->map(function($group, $key) {
+    //             $firstItem = $group->first();
+
+    //             $address = trim($firstItem['StreetNumber'] . ' ' . 
+    //                 ($firstItem['StreetDirPrefix'] ? $firstItem['StreetDirPrefix'] . ' ' : '') . 
+    //                 $firstItem['StreetName']);
+
+    //             $buildingName = !empty($firstItem['BuildingName']) ? $firstItem['BuildingName'] : $address;
+
+    //             // Calculate min and max prices
+    //             $prices = $group->pluck('ListPrice')->filter()->values();
+    //             $minPrice = $prices->min();
+    //             $maxPrice = $prices->max();
+
+    //             return [
+    //                 'type' => 'building',
+    //                 'building_name' => $buildingName,
+    //                 'street_number' => $firstItem['StreetNumber'],
+    //                 'street_dir_prefix' => $firstItem['StreetDirPrefix'],
+    //                 'street_name' => $firstItem['StreetName'],
+    //                 'address' => $address,
+    //                 'city' => $firstItem['City'],
+    //                 'state' => $firstItem['StateOrProvince'],
+    //                 'postal_code' => $firstItem['PostalCode'],
+    //                 'property_sub_type' => $firstItem['PropertySubType'],
+    //                 'unit_count' => $group->count(),
+    //                 'min_price' => $minPrice,
+    //                 'max_price' => $maxPrice,
+    //                 'display_text' => $buildingName . 
+    //                     ($firstItem['City'] ? ', ' . $firstItem['City'] : '') . 
+    //                     ($firstItem['StateOrProvince'] ? ', ' . $firstItem['StateOrProvince'] : '') . 
+    //                     ' (' . $group->count() . ' units)',
+    //                 'action_url' => "/api/buildings?street_number={$firstItem['StreetNumber']}&street_name=" . urlencode($firstItem['StreetName'])
+    //             ];
+    //         })->values();
+    //     }
+
+
+    //     private function fetchPlaceSuggestions($baseUrl, $accessToken, $query, $limit)
+    //     {
+    //         // We'll make three separate requests for cities, states, and postal codes
+    //         $cityLimit = ceil($limit / 3);
+    //         $stateLimit = ceil($limit / 3);
+    //         $postalCodeLimit = $limit - $cityLimit - $stateLimit;
+
+    //         // 1. City suggestions
+    //         $citySuggestions = $this->fetchCitySuggestions($baseUrl, $accessToken, $query, $cityLimit);
+
+    //         // 2. State suggestions
+    //         $stateSuggestions = $this->fetchStateSuggestions($baseUrl, $accessToken, $query, $stateLimit);
+
+    //         // 3. Postal code suggestions
+    //         $postalCodeSuggestions = $this->fetchPostalCodeSuggestions($baseUrl, $accessToken, $query, $postalCodeLimit);
+
+    //         // Combine all place suggestions
+    //         return $citySuggestions->concat($stateSuggestions)->concat($postalCodeSuggestions);
+    //     }
+
+
+    //     private function fetchCitySuggestions($baseUrl, $accessToken, $query, $limit)
+    //     {
+    //         $queryParams = [
+    //             'access_token' => $accessToken,
+    //             'limit' => $limit,
+    //             'fields' => 'City,StateOrProvince',
+    //             'groupBy' => 'City,StateOrProvince',
+    //             'q' => "City like '*{$query}*'"
+    //         ];
+
+    //         $response = Http::get($baseUrl, $queryParams);
+
+    //         if (!$response->successful()) {
+    //             Log::error('Bridge API request failed for city suggestions', [
+    //                 'status' => $response->status(),
+    //                 'response' => $response->json()
+    //             ]);
+    //             return collect([]);
+    //         }
+
+    //         $data = $response->json();
+    //         $cities = $data['bundle'] ?? [];
+
+    //         return collect($cities)->map(function ($item) {
+    //             return [
+    //                 'type' => 'place',
+    //                 'place_type' => 'city',
+    //                 'name' => $item['City'],
+    //                 'state' => $item['StateOrProvince'],
+    //                 'display_text' => $item['City'] . ($item['StateOrProvince'] ? ', ' . $item['StateOrProvince'] : ''),
+    //                 'action_url' => "/api/properties/search?city=" . urlencode($item['City'])
+    //             ];
+    //         });
+    //     }
+
+    // private function fetchStateSuggestions($baseUrl, $accessToken, $query, $limit)
+    // {
+    //     $queryParams = [
+    //         'access_token' => $accessToken,
+    //         'limit' => $limit,
+    //         'fields' => 'StateOrProvince',
+    //         'groupBy' => 'StateOrProvince',
+    //         'q' => "StateOrProvince like '*{$query}*'"
+    //     ];
+
+    //     $response = Http::get($baseUrl, $queryParams);
+
+    //     if (!$response->successful()) {
+    //         Log::error('Bridge API request failed for state suggestions', [
+    //             'status' => $response->status(),
+    //             'response' => $response->json()
+    //         ]);
+    //         return collect([]);
+    //     }
+
+    //     $data = $response->json();
+    //     $states = $data['bundle'] ?? [];
+
+    //     return collect($states)->map(function ($item) {
+    //         $fullStateName = $this->getFullStateName($item['StateOrProvince']);
+    //         return [
+    //             'type' => 'place',
+    //             'place_type' => 'state',
+    //             'name' => $fullStateName,
+    //             'code' => $item['StateOrProvince'],
+    //             'display_text' => $fullStateName,
+    //             'action_url' => "/api/properties/search?state=" . urlencode($item['StateOrProvince'])
+    //         ];
+    //     });
+    // }
+
+    // private function fetchPostalCodeSuggestions($baseUrl, $accessToken, $query, $limit)
+    // {
+    //     $queryParams = [
+    //         'access_token' => $accessToken,
+    //         'limit' => $limit,
+    //         'fields' => 'PostalCode,StateOrProvince',
+    //         'groupBy' => 'PostalCode,StateOrProvince',
+    //         'q' => "PostalCode like '*{$query}*'"
+    //     ];
+
+    //     $response = Http::get($baseUrl, $queryParams);
+
+    //     if (!$response->successful()) {
+    //         Log::error('Bridge API request failed for postal code suggestions', [
+    //             'status' => $response->status(),
+    //             'response' => $response->json()
+    //         ]);
+    //         return collect([]);
+    //     }
+
+    //     $data = $response->json();
+    //     $postalCodes = $data['bundle'] ?? [];
+
+    //     return collect($postalCodes)->map(function ($item) {
+    //         return [
+    //             'type' => 'place',
+    //             'place_type' => 'postal_code',
+    //             'name' => $item['PostalCode'],
+    //             'display_text' => $item['PostalCode'] . ($item['StateOrProvince'] ? ', ' . $item['StateOrProvince'] : ''),
+    //             'action_url' => "/api/properties/search?postalCode=" . $item['PostalCode']
+    //         ];
+    //     });
+    // }
+
+
+
+
+    // public function autocomplete(Request $request)
+    // {
+
+    //     // Get search parameters
+    //     $query = $request->input('q') ?? $request->input('query');
+    //     $type = $request->input('type'); // 'buy' or 'rent'
+    //     $limit = $request->input('limit', 10); // Default 10 suggestions total
+
+    //     // Early return for empty queries
+    //     if (empty($query) || strlen($query) < 1) {
+    //         return response()->json([
+    //             'suggestions' => [
+    //                 'addresses' => [],
+    //                 'buildings' => [],
+    //                 'places' => []
+    //             ]
+    //         ]);
+    //     }
+
+    //     // Bridge API configuration
+    //     $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
+    //     $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
+
+    //     try {
+    //         // Make a single unified search request to get all types of results
+    //         $params = [
+    //             'access_token' => $accessToken,
+    //             'limit' => $limit * 3, // Get enough results to cover all categories
+    //             'fields' => 'ListingId,ListingKey,UnparsedAddress,StreetNumber,StreetName,StreetDirPrefix,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice,StandardStatus,BuildingName',
+    //             // Prioritize BuildingName in the search query
+    //             'q' => "BuildingName like '*{$query}*' OR UnparsedAddress like '*{$query}*' OR StreetNumber like '*{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*' OR StateOrProvince like '*{$query}*' OR PostalCode like '*{$query}*'"
+    //         ];
+
+    //         // Apply type filter if specified
+    //         // Apply type filter if specified
+    //         if ($type) {
+    //             // dd($request->input('type'));
+    //             if ($type === 'buy') {
+    //                 $params['PropertyType'] = 'Residential';
+    //                 $params['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
+    //             } elseif ($type === 'rent') {
+    //                 $params['PropertyType'] = 'Residential Lease';
+    //                 $params['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
+    //                 // $queryParams['PropertySubType'] = 'Rental';
+    //             }
+    //         }
+
+
+    //         // Make the API request - DISABLE SSL VERIFICATION
+    //         $response = Http::withOptions([
+    //             'verify' => false, // Disable SSL verification
+    //         ])->get($baseUrl, $params);
+
+    //         if (!$response->successful()) {
+    //             throw new \Exception('Failed to fetch suggestions: ' . $response->body());
+    //         }
+
+    //         $data = $response->json();
+    //         dd($data);
+    //         $properties = $data['bundle'] ?? [];
+
+    //         // Add a debug log to see if the API is returning the building you're looking for
+    //         \Log::info('Bridge API response for building search', [
+    //             'query' => $query,
+    //             'building_count' => count($properties),
+    //             'buildings_with_name' => collect($properties)->filter(function ($p) use ($query) {
+    //                 return !empty($p['BuildingName']) && stripos($p['BuildingName'], $query) !== false;
+    //             })->pluck('BuildingName')->toArray()
+    //         ]);
+
+    //         // Process the results into different categories
+    //         $addressSuggestions = [];
+    //         $buildingGroups = [];
+    //         $cities = [];
+    //         $states = [];
+    //         $postalCodes = [];
+
+    //         // First pass: collect unique cities, states, postal codes
+    //         foreach ($properties as $property) {
+    //             // Add cities
+    //             if (!empty($property['City']) && stripos($property['City'], $query) !== false) {
+    //                 $cityKey = strtolower($property['City'] . '-' . ($property['StateOrProvince'] ?? ''));
+    //                 if (!isset($cities[$cityKey])) {
+    //                     $cities[$cityKey] = [
+    //                         'type' => 'place',
+    //                         'place_type' => 'city',
+    //                         'name' => $property['City'],
+    //                         'state' => $property['StateOrProvince'] ?? '',
+    //                         'display_text' => $property['City'] . (isset($property['StateOrProvince']) ? ', ' . $property['StateOrProvince'] : ''),
+    //                         'action_url' => "/properties/search?city=" . urlencode($property['City'])
+    //                     ];
+    //                 }
+    //             }
+
+    //             // Add states
+    //             if (!empty($property['StateOrProvince']) && stripos($property['StateOrProvince'], $query) !== false) {
+    //                 $stateKey = strtolower($property['StateOrProvince']);
+    //                 if (!isset($states[$stateKey])) {
+    //                     $fullStateName = $this->getFullStateName($property['StateOrProvince']);
+    //                     $states[$stateKey] = [
+    //                         'type' => 'place',
+    //                         'place_type' => 'state',
+    //                         'name' => $fullStateName ?? $property['StateOrProvince'],
+    //                         'code' => $property['StateOrProvince'],
+    //                         'display_text' => $fullStateName ?? $property['StateOrProvince'],
+    //                         'action_url' => "/properties/search?state=" . urlencode($property['StateOrProvince'])
+    //                     ];
+    //                 }
+    //             }
+
+    //             // Add postal codes
+    //             if (!empty($property['PostalCode']) && stripos($property['PostalCode'], $query) !== false) {
+    //                 $postalKey = strtolower($property['PostalCode'] . '-' . ($property['StateOrProvince'] ?? ''));
+    //                 if (!isset($postalCodes[$postalKey])) {
+    //                     $postalCodes[$postalKey] = [
+    //                         'type' => 'place',
+    //                         'place_type' => 'postal_code',
+    //                         'name' => $property['PostalCode'],
+    //                         'display_text' => $property['PostalCode'] . (isset($property['StateOrProvince']) ? ', ' . $property['StateOrProvince'] : ''),
+    //                         'action_url' => "/properties/search?postalCode=" . $property['PostalCode']
+    //                     ];
+    //                 }
+    //             }
+
+    //             // Group properties by address to identify buildings
+    //             if (!empty($property['StreetNumber']) && !empty($property['StreetName'])) {
+    //                 $addressKey = $property['StreetNumber'] . '-' . $property['StreetName'];
+
+    //                 if (!isset($buildingGroups[$addressKey])) {
+    //                     $buildingGroups[$addressKey] = [
+    //                         'properties' => [],
+    //                         'building_name' => $property['BuildingName'] ?? '',
+    //                         'street_number' => $property['StreetNumber'],
+    //                         'street_name' => $property['StreetName'],
+    //                         'street_dir_prefix' => $property['StreetDirPrefix'] ?? '',
+    //                         'city' => $property['City'] ?? '',
+    //                         'state' => $property['StateOrProvince'] ?? '',
+    //                         'postal_code' => $property['PostalCode'] ?? '',
+    //                         'property_sub_type' => $property['PropertySubType'] ?? '',
+    //                         'is_condo' => (isset($property['PropertySubType']) && $property['PropertySubType'] === 'Condominium'),
+    //                         'matches_query' => false, // Flag to track if this building matches the query
+    //                         'prices' => []
+    //                     ];
+    //                 }
+
+    //                 $buildingGroups[$addressKey]['properties'][] = $property;
+
+    //                 // Check if this property's building name matches the query
+    //                 if (!empty($property['BuildingName']) && stripos($property['BuildingName'], $query) !== false) {
+    //                     $buildingGroups[$addressKey]['matches_query'] = true;
+    //                     $buildingGroups[$addressKey]['building_name'] = $property['BuildingName'];
+    //                 }
+
+    //                 // Check if this property is a Condominium
+    //                 if (isset($property['PropertySubType']) && $property['PropertySubType'] === 'Condominium') {
+    //                     $buildingGroups[$addressKey]['is_condo'] = true;
+    //                     $buildingGroups[$addressKey]['property_sub_type'] = 'Condominium';
+    //                 }
+
+    //                 if (!empty($property['BuildingName'])) {
+    //                     $buildingGroups[$addressKey]['building_name'] = $property['BuildingName'];
+    //                 }
+
+    //                 if (isset($property['ListPrice']) && $property['ListPrice'] > 0) {
+    //                     $buildingGroups[$addressKey]['prices'][] = $property['ListPrice'];
+    //                 }
+    //             }
+
+    //             // Add individual properties as address suggestions
+    //             if (
+    //                 !empty($property['UnparsedAddress']) &&
+    //                 (
+    //                     stripos($property['UnparsedAddress'], $query) !== false ||
+    //                     (!empty($property['StreetNumber']) && stripos($property['StreetNumber'], $query) !== false) ||
+    //                     (!empty($property['StreetName']) && stripos($property['StreetName'], $query) !== false)
+    //                 )
+    //             ) {
+    //                 $address = $property['UnparsedAddress'] ?? '';
+    //                 if (empty($address) && isset($property['StreetNumber'], $property['StreetName'])) {
+    //                     $address = $property['StreetNumber'] . ' ' . $property['StreetName'];
+    //                     if (!empty($property['UnitNumber'])) {
+    //                         $address .= ' #' . $property['UnitNumber'];
+    //                     }
+    //                 }
+
+    //                 $addressSuggestions[] = [
+    //                     'type' => 'address',
+    //                     'id' => $property['ListingId'] ?? null,
+    //                     'listing_key' => $property['ListingKey'] ?? null,
+    //                     'address' => $address,
+    //                     'city' => $property['City'] ?? '',
+    //                     'state' => $property['StateOrProvince'] ?? '',
+    //                     'postal_code' => $property['PostalCode'] ?? '',
+    //                     'property_type' => $property['PropertySubType'] ?? '',
+    //                     'price' => $property['ListPrice'] ?? null,
+    //                     'status' => $property['StandardStatus'] ?? '',
+    //                     'display_text' => $address .
+    //                         (isset($property['City']) ? ', ' . $property['City'] : '') .
+    //                         (isset($property['StateOrProvince']) ? ', ' . $property['StateOrProvince'] : ''),
+    //                     'action_url' => "/properties/" . ($property['ListingId'] ?? '')
+    //                 ];
+    //             }
+    //         }
+
+    //         // Process building groups to create building suggestions
+    //         $buildingSuggestions = [];
+    //         foreach ($buildingGroups as $key => $group) {
+    //             // Only include as a building if:
+    //             // 1. It's a Condominium, AND
+    //             // 2. It has a building name OR multiple properties
+    //             if ($group['is_condo'] && (!empty($group['building_name']) || count($group['properties']) > 1)) {
+    //                 $address = trim($group['street_number'] . ' ' .
+    //                     ($group['street_dir_prefix'] ? $group['street_dir_prefix'] . ' ' : '') .
+    //                     $group['street_name']);
+
+    //                 $buildingName = !empty($group['building_name']) ? $group['building_name'] : $address;
+
+    //                 // Check if this building matches the search query
+    //                 $nameMatches = !empty($buildingName) && stripos($buildingName, $query) !== false;
+    //                 $addressMatches = stripos($address, $query) !== false || stripos($group['street_name'], $query) !== false;
+
+    //                 // Only include if the building name or address matches the query
+    //                 if ($nameMatches || $addressMatches) {
+    //                     $prices = $group['prices'];
+    //                     $minPrice = !empty($prices) ? min($prices) : null;
+    //                     $maxPrice = !empty($prices) ? max($prices) : null;
+    //                     $unitCount = count($group['properties']);
+
+    //                     $buildingSuggestions[] = [
+    //                         'type' => 'building',
+    //                         'building_name' => $buildingName,
+    //                         'street_number' => $group['street_number'],
+    //                         'street_dir_prefix' => $group['street_dir_prefix'],
+    //                         'street_name' => $group['street_name'],
+    //                         'address' => $address,
+    //                         'city' => $group['city'],
+    //                         'state' => $group['state'],
+    //                         'postal_code' => $group['postal_code'],
+    //                         'property_sub_type' => 'Condominium',
+    //                         'unit_count' => $unitCount,
+    //                         'min_price' => $minPrice,
+    //                         'max_price' => $maxPrice,
+    //                         'display_text' => $buildingName .
+    //                             ($group['city'] ? ', ' . $group['city'] : '') .
+    //                             ($group['state'] ? ', ' . $group['state'] : '') .
+    //                             ' (' . $unitCount . ' units)',
+    //                         'action_url' => "/buildings?street_number={$group['street_number']}&street_name=" . urlencode($group['street_name'])
+    //                     ];
+    //                 }
+    //             }
+    //         }
+
+    //         // Sort building suggestions to prioritize building name matches
+    //         usort($buildingSuggestions, function ($a, $b) use ($query) {
+    //             // Check if building names match the query exactly
+    //             $aExactMatch = !empty($a['building_name']) && strtolower($a['building_name']) === strtolower($query);
+    //             $bExactMatch = !empty($b['building_name']) && strtolower($b['building_name']) === strtolower($query);
+
+    //             // Exact matches come first
+    //             if ($aExactMatch && !$bExactMatch) return -1;
+    //             if (!$aExactMatch && $bExactMatch) return 1;
+
+    //             // Check if building names start with the query
+    //             $aStartMatch = !empty($a['building_name']) && stripos($a['building_name'], $query) === 0;
+    //             $bStartMatch = !empty($b['building_name']) && stripos($b['building_name'], $query) === 0;
+
+    //             // Matches at the start of building name come next
+    //             if ($aStartMatch && !$bStartMatch) return -1;
+    //             if (!$aStartMatch && $bStartMatch) return 1;
+
+    //             // Then partial building name matches
+    //             $aPartialMatch = !empty($a['building_name']) && stripos($a['building_name'], $query) !== false;
+    //             $bPartialMatch = !empty($b['building_name']) && stripos($b['building_name'], $query) !== false;
+
+    //             if ($aPartialMatch && !$bPartialMatch) return -1;
+    //             if (!$aPartialMatch && $bPartialMatch) return 1;
+
+    //             // If both match equally, maintain original order
+    //             return 0;
+    //         });
+
+    //         // Combine all place suggestions
+    //         $placeSuggestions = array_merge(
+    //             array_values($cities),
+    //             array_values($states),
+    //             array_values($postalCodes)
+    //         );
+
+    //         // Limit each category
+    //         $addressLimit = ceil($limit * 0.4);
+    //         $buildingLimit = ceil($limit * 0.3);
+    //         $placeLimit = $limit - $addressLimit - $buildingLimit;
+
+    //         $addressSuggestions = array_slice($addressSuggestions, 0, $addressLimit);
+    //         $buildingSuggestions = array_slice($buildingSuggestions, 0, $buildingLimit);
+    //         $placeSuggestions = array_slice($placeSuggestions, 0, $placeLimit);
+
+    //         return response()->json([
+    //             'suggestions' => [
+    //                 'addresses' => $addressSuggestions,
+    //                 'buildings' => $buildingSuggestions,
+    //                 'places' => $placeSuggestions
+    //             ]
+    //         ]);
+    //     } catch (\Exception $e) {
+    //         \Log::error('Bridge API autocomplete error', [
+    //             'message' => $e->getMessage(),
+    //             'query' => $query
+    //         ]);
+
+    //         return response()->json([
+    //             'error' => 'Failed to fetch suggestions',
+    //             'message' => $e->getMessage(),
+    //             'suggestions' => [
+    //                 'addresses' => [],
+    //                 'buildings' => [],
+    //                 'places' => []
+    //             ]
+    //         ], 500);
+    //     }
+    // }
 
 public function autocomplete(Request $request)
 {
-    // Get search parameters
     $query = $request->input('q') ?? $request->input('query');
-    $type = $request->input('type'); // 'buy' or 'rent'
-    $limit = $request->input('limit', 5);
-    
-    // Early return for empty queries
+    $type = $request->input('type');
+    $limit = $request->input('limit', 10);
+
     if (empty($query) || strlen($query) < 1) {
         return response()->json([
             'suggestions' => [
@@ -1884,408 +2206,783 @@ public function autocomplete(Request $request)
             ]
         ]);
     }
-    
-    // Check cache first (with 5 minute expiration)
-    $cacheKey = "autocomplete:{$query}:{$type}:{$limit}";
-    if (Cache::has($cacheKey)) {
-        return response()->json(Cache::get($cacheKey));
-    }
-    
-    // Allocate limits
-    $addressLimit = ceil($limit * 0.4);
-    $buildingLimit = ceil($limit * 0.3);
-    $placeLimit = ceil($limit * 0.3);
-    
-    // API credentials
+
     $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
     $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
-    
+    $fields = 'ListingId,ListingKey,UnparsedAddress,StreetNumber,StreetName,StreetDirPrefix,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice,StandardStatus,BuildingName';
+
     try {
-        // Make API requests in parallel using promises
-        $promises = [
-            'addresses' => $this->fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $type, $addressLimit),
-            'buildings' => $this->fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $buildingLimit),
-            'places' => $this->fetchPlaceSuggestionsAsync($baseUrl, $accessToken, $query, $placeLimit)
+        // Building query
+        $buildingParams = [
+            'access_token' => $accessToken,
+            'BuildingName' => "*{$query}*",
+            'PropertySubType' => 'Condominium',
+            'fields' => $fields,
+            'limit' => $limit
         ];
-        
-        // Wait for all promises to complete
-        $results = [];
-        foreach ($promises as $key => $promise) {
-            try {
-                $results[$key] = $promise();
-            } catch (\Exception $e) {
-                Log::error("Error fetching {$key}", ['exception' => $e->getMessage()]);
-                $results[$key] = collect([]);
+        if ($type === 'buy') {
+            $buildingParams['PropertyType'] = 'Residential';
+            $buildingParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
+        } elseif ($type === 'rent') {
+            $buildingParams['PropertyType'] = 'Residential Lease';
+            $buildingParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
+        }
+        $buildingResponse = Http::get($baseUrl, $buildingParams);
+        $buildingProperties = $buildingResponse->successful() ? $buildingResponse->json()['bundle'] ?? [] : [];
+
+        // Address query
+        $addressParams = [
+            'access_token' => $accessToken,
+            'limit' => $limit,
+            'fields' => $fields,
+            'UnparsedAddress' => "*{$query}*"
+        ];
+        if ($type === 'buy') {
+            $addressParams['PropertyType'] = 'Residential';
+            $addressParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
+        } elseif ($type === 'rent') {
+            $addressParams['PropertyType'] = 'Residential Lease';
+            $addressParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
+        }
+        $addressResponse = Http::get($baseUrl, $addressParams);
+        $addressProperties = $addressResponse->successful() ? $addressResponse->json()['bundle'] ?? [] : [];
+
+        // City query
+        $cityParams = [
+            'access_token' => $accessToken,
+            'limit' => $limit,
+            'fields' => 'City,StateOrProvince',
+            'City' => "*{$query}*",
+            'groupBy' => 'City,StateOrProvince'
+        ];
+        $cityResponse = Http::get($baseUrl, $cityParams);
+        $cityProperties = $cityResponse->successful() ? $cityResponse->json()['bundle'] ?? [] : [];
+
+        // State query
+        $stateParams = [
+            'access_token' => $accessToken,
+            'limit' => $limit,
+            'fields' => 'StateOrProvince',
+            'StateOrProvince' => "*{$query}*",
+            'groupBy' => 'StateOrProvince'
+        ];
+        $stateResponse = Http::get($baseUrl, $stateParams);
+        $stateProperties = $stateResponse->successful() ? $stateResponse->json()['bundle'] ?? [] : [];
+
+        // Postal code query
+        $postalParams = [
+            'access_token' => $accessToken,
+            'limit' => $limit,
+            'fields' => 'PostalCode,StateOrProvince',
+            'PostalCode' => "*{$query}*",
+            'groupBy' => 'PostalCode,StateOrProvince'
+        ];
+        $postalResponse = Http::withOptions(['verify' => false])->get($baseUrl, $postalParams);
+        $postalProperties = $postalResponse->successful() ? $postalResponse->json()['bundle'] ?? [] : [];
+
+        // Process data
+        $buildingSuggestions = [];
+        foreach ($buildingProperties as $property) {
+            if (!empty($property['BuildingName'])) {
+                $key = strtolower($property['BuildingName'] . '-' . ($property['StreetNumber'] ?? '') . '-' . ($property['StreetName'] ?? ''));
+                if (!isset($buildingSuggestions[$key])) {
+                    $address = trim(($property['StreetNumber'] ?? '') . ' ' . ($property['StreetDirPrefix'] ?? '') . ' ' . ($property['StreetName'] ?? ''));
+                    $buildingSuggestions[$key] = [
+                        'type' => 'building',
+                        'building_name' => $property['BuildingName'],
+                        'address' => $address,
+                        'city' => $property['City'] ?? '',
+                        'state' => $property['StateOrProvince'] ?? '',
+                        'postal_code' => $property['PostalCode'] ?? '',
+                        'property_sub_type' => $property['PropertySubType'] ?? '',
+                        'prices' => [$property['ListPrice'] ?? 0],
+                        'display_text' => $property['BuildingName'] . ', ' . ($property['City'] ?? '') . ', ' . ($property['StateOrProvince'] ?? ''),
+                        'action_url' => "/buildings?street_number={$property['StreetNumber']}&street_name=" . urlencode($property['StreetName'] ?? '')
+                    ];
+                } else {
+                    $buildingSuggestions[$key]['prices'][] = $property['ListPrice'] ?? 0;
+                }
             }
         }
-        // Format the response
-        $response = [
-            'suggestions' => [
-                'addresses' => $results['addresses'],
-                'buildings' => $results['buildings'],
-                'places' => $results['places']
-            ]
-        ];
-        
-        // Cache the response
-        Cache::put($cacheKey, $response, 300); // 5 minutes
-        
-        return response()->json($response);
-        
-    } catch (\Exception $e) {
-        Log::error('Exception in autocomplete', [
-            'exception' => $e->getMessage(),
-            'query' => $query
-        ]);
-        
+
+        $addressSuggestions = [];
+        foreach ($addressProperties as $property) {
+            if (!empty($property['UnparsedAddress'])) {
+                $addressSuggestions[] = [
+                    'type' => 'address',
+                    'address' => $property['UnparsedAddress'],
+                    'city' => $property['City'] ?? '',
+                    'state' => $property['StateOrProvince'] ?? '',
+                    'postal_code' => $property['PostalCode'] ?? '',
+                    'display_text' => $property['UnparsedAddress'],
+                    'action_url' => "/properties/search?address=" . urlencode($property['UnparsedAddress'])
+                ];
+            }
+        }
+
+        $placeSuggestions = [];
+
+        foreach ($cityProperties as $c) {
+            if (!empty($c['City'])) {
+                $placeSuggestions[] = [
+                    'type' => 'place',
+                    'place_type' => 'city',
+                    'name' => $c['City'],
+                    'state' => $c['StateOrProvince'] ?? '',
+                    'display_text' => $c['City'] . ', ' . ($c['StateOrProvince'] ?? ''),
+                    'action_url' => "/properties/search?city=" . urlencode($c['City'])
+                ];
+            }
+        }
+
+        foreach ($stateProperties as $s) {
+            if (!empty($s['StateOrProvince'])) {
+                $placeSuggestions[] = [
+                    'type' => 'place',
+                    'place_type' => 'state',
+                    'name' => $s['StateOrProvince'],
+                    'display_text' => $s['StateOrProvince'],
+                    'action_url' => "/properties/search?state=" . urlencode($s['StateOrProvince'])
+                ];
+            }
+        }
+
+        foreach ($postalProperties as $p) {
+            if (!empty($p['PostalCode'])) {
+                $placeSuggestions[] = [
+                    'type' => 'place',
+                    'place_type' => 'postal_code',
+                    'name' => $p['PostalCode'],
+                    'display_text' => $p['PostalCode'] . ', ' . ($p['StateOrProvince'] ?? ''),
+                    'action_url' => "/properties/search?postalCode=" . urlencode($p['PostalCode'])
+                ];
+            }
+        }
+
         return response()->json([
-            'success' => false,
-            'message' => 'An error occurred while fetching suggestions',
             'suggestions' => [
-                'addresses' => [],
-                'buildings' => [],
-                'places' => []
+                'addresses' => array_values($addressSuggestions),
+                'buildings' => array_values($buildingSuggestions),
+                'places' => $placeSuggestions
             ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'error' => 'Autocomplete failed: ' . $e->getMessage()
         ], 500);
     }
 }
 
-// Async version of address suggestions
-private function fetchAddressSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
-{
-    return function() use ($baseUrl, $accessToken, $query, $type, $limit) {
-        $queryParams = [
+
+
+
+
+
+
+    private function fetchAddressSuggestionsFromAPI($baseUrl, $accessToken, $query, $type, $limit)
+    {
+        // Build query parameters
+        $params = [
             'access_token' => $accessToken,
             'limit' => $limit,
-            'fields' => 'ListingId,ListingKey,StreetNumber,StreetName,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,StandardStatus',
-            'order' => 'ListPrice asc'
+            'fields' => 'ListingId,ListingKey,UnparsedAddress,StreetNumber,StreetName,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,ListPrice,StandardStatus',
         ];
-        
-        // Add search conditions - simplified for better performance
-        $queryParams['q'] = "StreetNumber eq '{$query}*' OR StreetName like '*{$query}*' OR City like '{$query}*'";
-        
-        // // Apply type filter
-        // if ($type) {
-        //     if (strtolower($type) === 'buy') {
-        //         $queryParams['PropertyType.ne'] = 'Residential Lease'; // Fixed assignment
-        //     } elseif (strtolower($type) === 'rent') {
-        //         $queryParams['PropertyType'] = 'Residential Lease';
-        //     }
-        // }
-        
-        $response = Http::get($baseUrl, $queryParams);
-        
-        if (!$response->successful()) {
-            Log::error('Bridge API request failed for address suggestions', [
-                'status' => $response->status(),
-                'response' => $response->json()
-            ]);
-            return [];
+
+        // Add search query
+        $params['q'] = "UnparsedAddress like '*{$query}*' OR StreetNumber eq '{$query}*' OR StreetName like '*{$query}*'";
+
+        // Add property type filter if specified
+        if ($type) {
+            if (strtolower($type) === 'buy') {
+                $params['PropertyType.ne'] = 'Residential Lease';
+            } else if (strtolower($type) === 'rent') {
+                $params['PropertyType'] = 'Residential Lease';
+            }
         }
-        
+
+        // Make the API request - DISABLE SSL VERIFICATION
+        $response = Http::withOptions([
+            'verify' => false, // Disable SSL verification
+        ])->get($baseUrl, $params);
+
+        // Log the response for debugging
+        \Log::info('Bridge API address response', [
+            'status' => $response->status(),
+            'body' => substr($response->body(), 0, 500) // Log first 500 chars to avoid huge logs
+        ]);
+
+        if (!$response->successful()) {
+            throw new \Exception('Failed to fetch address suggestions: ' . $response->body());
+        }
+
         $data = $response->json();
         $properties = $data['bundle'] ?? [];
-        
-        // Return raw data to minimize processing time
-        return array_map(function ($item) {
-            $address = trim($item['StreetNumber'] . ' ' . $item['StreetName']);
-            if (!empty($item['UnitNumber'])) {
-                $address .= ' #' . $item['UnitNumber'];
+
+        return collect($properties)->map(function ($item) {
+            $address = $item['UnparsedAddress'] ?? '';
+            if (empty($address) && isset($item['StreetNumber'], $item['StreetName'])) {
+                $address = $item['StreetNumber'] . ' ' . $item['StreetName'];
+                if (!empty($item['UnitNumber'])) {
+                    $address .= ' #' . $item['UnitNumber'];
+                }
             }
-            
+
             return [
                 'type' => 'address',
-                'id' => $item['ListingId'],
-                'listing_key' => $item['ListingKey'],
+                'id' => $item['ListingId'] ?? null,
+                'listing_key' => $item['ListingKey'] ?? null,
                 'address' => $address,
-                'city' => $item['City'],
-                'state' => $item['StateOrProvince'],
-                'display_text' => $address . ', ' . $item['City'] . ', ' . $item['StateOrProvince'],
-                'action_url' => "/api/properties/{$item['ListingId']}"
+                'city' => $item['City'] ?? '',
+                'state' => $item['StateOrProvince'] ?? '',
+                'postal_code' => $item['PostalCode'] ?? '',
+                'property_type' => $item['PropertySubType'] ?? '',
+                'price' => $item['ListPrice'] ?? null,
+                'status' => $item['StandardStatus'] ?? '',
+                'display_text' => $address .
+                    (isset($item['City']) ? ', ' . $item['City'] : '') .
+                    (isset($item['StateOrProvince']) ? ', ' . $item['StateOrProvince'] : ''),
+                'action_url' => "/properties/" . ($item['ListingId'] ?? '')
             ];
-        }, $properties);
-    };
-}
+        })->values();
+    }
 
-// Async version of building suggestions
-private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
-{
-    // First, try to find buildings directly by searching for BuildingName
-    $buildingQueryParams = [
-        'access_token' => $accessToken,
-        'limit' => 200, // Get more results to ensure we find buildings with names
-        'fields' => 'ListingId,BuildingName,StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice',
-        // Prioritize BuildingName in the search query
-        'q' => "BuildingName like '*{$query}*' OR CONCAT(StreetNumber,' ',StreetName) like '*{$query}*'"
-    ];
-    
-    // Apply type filter if provided
-    if ($type) {
-        if (strtolower($type) === 'buy') {
-            $buildingQueryParams['PropertyType.ne'] = 'Residential Lease';
-        } elseif (strtolower($type) === 'rent') {
-            $buildingQueryParams['PropertyType'] = 'Residential Lease';
-        }
-    }
-    
-    // Make the API request
-    $response = Http::get($baseUrl, $buildingQueryParams);
-    
-    if (!$response->successful()) {
-        Log::error('Bridge API request failed for building suggestions', [
-            'status' => $response->status(),
-            'response' => $response->json()
-        ]);
-        return collect([]);
-    }
-    
-    $data = $response->json();
-    $properties = $data['bundle'] ?? [];
-    
-    // Group properties by building name first
-    $buildingGroups = [];
-    
-    // First pass: group by BuildingName when available
-    foreach ($properties as $property) {
-        if (!empty($property['BuildingName'])) {
-            $buildingName = $property['BuildingName'];
-            
-            if (!isset($buildingGroups[$buildingName])) {
-                $buildingGroups[$buildingName] = [
-                    'properties' => [],
-                    'building_name' => $buildingName,
-                    'address' => trim($property['StreetNumber'] . ' ' . $property['StreetName']),
-                    'city' => $property['City'],
-                    'state' => $property['StateOrProvince'],
-                    'postal_code' => $property['PostalCode'] ?? '',
-                    'street_number' => $property['StreetNumber'],
-                    'street_name' => $property['StreetName'],
-                    'street_dir_prefix' => $property['StreetDirPrefix'] ?? '',
-                    'prices' => []
-                ];
-            }
-            
-            $buildingGroups[$buildingName]['properties'][] = $property;
-            
-            if (isset($property['ListPrice']) && $property['ListPrice'] > 0) {
-                $buildingGroups[$buildingName]['prices'][] = $property['ListPrice'];
+    private function fetchBuildingSuggestionsFromAPI($baseUrl, $accessToken, $query, $type, $limit)
+    {
+        // Define property types that are typically individual properties
+        $individualPropertyTypes = [
+            'Land',
+            'SingleFamilyResidence',
+            'Business',
+            'BusinessOpportunity',
+            'UnimprovedLand',
+            'Special Purpose'
+        ];
+
+        // Build query parameters for buildings
+        $params = [
+            'access_token' => $accessToken,
+            'limit' => max(50, $limit * 3), // Get more results to ensure we can find buildings
+            'fields' => 'ListingId,ListingKey,UnparsedAddress,StreetNumber,StreetName,StreetDirPrefix,UnitNumber,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice,BuildingName',
+        ];
+
+        // Add search query for buildings
+        $params['q'] = "BuildingName like '*{$query}*' OR CONCAT(StreetNumber,' ',StreetName) like '*{$query}*' OR StreetName like '*{$query}*' OR City like '*{$query}*'";
+
+        // Add property type filter if specified
+        if ($type) {
+            if (strtolower($type) === 'buy') {
+                $params['PropertyType.ne'] = 'Residential Lease';
+            } else if (strtolower($type) === 'rent') {
+                $params['PropertyType'] = 'Residential Lease';
             }
         }
-    }
-    
-    // Second pass: group by address for properties without BuildingName
-    $addressGroups = [];
-    
-    foreach ($properties as $property) {
-        // Skip if missing required fields
-        if (!isset($property['StreetNumber']) || !isset($property['StreetName'])) {
-            continue;
+
+        // Make the API request - DISABLE SSL VERIFICATION
+        $response = Http::withOptions([
+            'verify' => false, // Disable SSL verification
+        ])->get($baseUrl, $params);
+
+        if (!$response->successful()) {
+            \Log::warning('Failed to fetch building suggestions', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            return collect([]);
         }
-        
-        // Skip if this property was already grouped by BuildingName
-        if (!empty($property['BuildingName']) && isset($buildingGroups[$property['BuildingName']])) {
-            continue;
-        }
-        
-        $addressKey = $property['StreetNumber'] . '-' . $property['StreetName'] . '-' . $property['City'];
-        
-        if (!isset($addressGroups[$addressKey])) {
-            $addressGroups[$addressKey] = [
-                'properties' => [],
-                'building_name' => '', // Will be filled if any property has a BuildingName
-                'address' => trim($property['StreetNumber'] . ' ' . $property['StreetName']),
-                'city' => $property['City'],
-                'state' => $property['StateOrProvince'],
-                'postal_code' => $property['PostalCode'] ?? '',
-                'street_number' => $property['StreetNumber'],
-                'street_name' => $property['StreetName'],
-                'street_dir_prefix' => $property['StreetDirPrefix'] ?? '',
-                'prices' => []
-            ];
-        }
-        
-        // If this property has a BuildingName, use it for the whole address group
-        if (!empty($property['BuildingName']) && empty($addressGroups[$addressKey]['building_name'])) {
-            $addressGroups[$addressKey]['building_name'] = $property['BuildingName'];
-        }
-        
-        $addressGroups[$addressKey]['properties'][] = $property;
-        
-        if (isset($property['ListPrice']) && $property['ListPrice'] > 0) {
-            $addressGroups[$addressKey]['prices'][] = $property['ListPrice'];
-        }
-    }
-    
-    // Filter address groups to only include those with multiple properties (actual buildings)
-    $addressGroups = array_filter($addressGroups, function($group) {
-        return count($group['properties']) > 1;
-    });
-    
-    // Combine the two sets of buildings
-    $allBuildings = array_values($buildingGroups);
-    
-    // Add address-based buildings that have a building name
-    foreach ($addressGroups as $group) {
-        if (!empty($group['building_name'])) {
-            $allBuildings[] = $group;
-        }
-    }
-    
-    // If we don't have enough results, add address-based buildings without names
-    if (count($allBuildings) < $limit) {
-        foreach ($addressGroups as $group) {
-            if (empty($group['building_name'])) {
-                // For buildings without a name, try to create a descriptive name
-                $propertyTypes = array_unique(array_map(function($prop) {
-                    return $prop['PropertySubType'] ?? '';
-                }, $group['properties']));
-                
-                $commonType = !empty($propertyTypes) ? reset($propertyTypes) : '';
-                
-                if (!empty($commonType)) {
-                    // Create a name like "400 Main St Condominiums"
-                    $group['building_name'] = $group['address'] . ' ' . $commonType;
-                } else {
-                    // Just use the address
-                    $group['building_name'] = $group['address'];
-                }
-                
-                $allBuildings[] = $group;
-                
-                if (count($allBuildings) >= $limit) {
+
+        $data = $response->json();
+        $properties = $data['bundle'] ?? [];
+
+        // Group properties by address to identify buildings (multiple units at same address)
+        $buildingGroups = collect($properties)->groupBy(function ($item) {
+            // Create a key based on street number and name
+            $streetNumber = $item['StreetNumber'] ?? '';
+            $streetName = $item['StreetName'] ?? '';
+
+            if (empty($streetNumber) || empty($streetName)) {
+                return null; // Skip items without proper address
+            }
+
+            return $streetNumber . '-' . $streetName;
+        })->filter(function ($group, $key) {
+            return $key !== 'null' && count($group) > 1; // Only keep groups with multiple properties
+        });
+
+        // Format building groups into building suggestions
+        $buildingSuggestions = $buildingGroups->map(function ($group, $key) {
+            $firstProperty = $group->first();
+
+            // Get building name if available, otherwise use address
+            $buildingName = '';
+            foreach ($group as $property) {
+                if (!empty($property['BuildingName'])) {
+                    $buildingName = $property['BuildingName'];
                     break;
                 }
             }
-        }
-    }
-    
-    // Sort buildings by relevance to the query
-    usort($allBuildings, function($a, $b) use ($query) {
-        // Buildings with names that match the query come first
-        $aNameMatch = stripos($a['building_name'], $query) !== false;
-        $bNameMatch = stripos($b['building_name'], $query) !== false;
-        
-        if ($aNameMatch && !$bNameMatch) return -1;
-        if (!$aNameMatch && $bNameMatch) return 1;
-        
-        // Then buildings with addresses that match the query
-        $aAddressMatch = stripos($a['address'], $query) !== false;
-        $bAddressMatch = stripos($b['address'], $query) !== false;
-        
-        if ($aAddressMatch && !$bAddressMatch) return -1;
-        if (!$aAddressMatch && $bAddressMatch) return 1;
-        
-        // Then sort by number of units (more units first)
-        return count($b['properties']) - count($a['properties']);
-    });
-    
-    // Format the results
-    $results = collect(array_slice($allBuildings, 0, $limit))->map(function($building) {
-        $prices = $building['prices'];
-        $minPrice = !empty($prices) ? min($prices) : null;
-        $maxPrice = !empty($prices) ? max($prices) : null;
-        
-        return [
-            'type' => 'building',
-            'building_name' => $building['building_name'],
-            'address' => $building['address'],
-            'city' => $building['city'],
-            'state' => $building['state'],
-            'postal_code' => $building['postal_code'],
-            'street_number' => $building['street_number'],
-            'street_name' => $building['street_name'],
-            'street_dir_prefix' => $building['street_dir_prefix'],
-            'unit_count' => count($building['properties']),
-            'min_price' => $minPrice,
-            'max_price' => $maxPrice,
-            'display_text' => $building['building_name'] . 
-                ($building['city'] ? ', ' . $building['city'] : '') . 
-                ($building['state'] ? ', ' . $building['state'] : '') . 
-                ' (' . count($building['properties']) . ' units)',
-            'action_url' => "/api/buildings?street_number={$building['street_number']}&street_name=" . urlencode($building['street_name'])
-        ];
-    });
-    
-    return $results;
-}
 
-// Async version of place suggestions
-private function fetchPlaceSuggestionsAsync($baseUrl, $accessToken, $query, $limit)
-{
-    return function() use ($baseUrl, $accessToken, $query, $limit) {
-        // Combine places into a single API call if possible
-        $queryParams = [
+            $streetNumber = $firstProperty['StreetNumber'] ?? '';
+            $streetName = $firstProperty['StreetName'] ?? '';
+            $streetDirPrefix = $firstProperty['StreetDirPrefix'] ?? '';
+
+            $address = trim($streetNumber . ' ' .
+                ($streetDirPrefix ? $streetDirPrefix . ' ' : '') .
+                $streetName);
+
+            if (empty($buildingName)) {
+                $buildingName = $address;
+            }
+
+            // Calculate min and max prices
+            $prices = $group->pluck('ListPrice')->filter()->values();
+            $minPrice = $prices->min();
+            $maxPrice = $prices->max();
+
+            return [
+                'type' => 'building',
+                'building_name' => $buildingName,
+                'street_number' => $streetNumber,
+                'street_dir_prefix' => $streetDirPrefix,
+                'street_name' => $streetName,
+                'address' => $address,
+                'city' => $firstProperty['City'] ?? '',
+                'state' => $firstProperty['StateOrProvince'] ?? '',
+                'postal_code' => $firstProperty['PostalCode'] ?? '',
+                'property_sub_type' => $firstProperty['PropertySubType'] ?? '',
+                'unit_count' => count($group),
+                'min_price' => $minPrice,
+                'max_price' => $maxPrice,
+                'display_text' => $buildingName .
+                    (isset($firstProperty['City']) ? ', ' . $firstProperty['City'] : '') .
+                    (isset($firstProperty['StateOrProvince']) ? ', ' . $firstProperty['StateOrProvince'] : '') .
+                    ' (' . count($group) . ' units)',
+                'action_url' => "/buildings?street_number={$streetNumber}&street_name=" . urlencode($streetName)
+            ];
+        })->values()->take($limit);
+
+        return $buildingSuggestions;
+    }
+
+    private function fetchPlaceSuggestionsFromAPI($baseUrl, $accessToken, $query, $limit)
+    {
+        // We'll make separate requests for cities, states, and postal codes
+        $cityLimit = ceil($limit * 0.5);
+        $stateLimit = ceil($limit * 0.25);
+        $postalLimit = $limit - $cityLimit - $stateLimit;
+
+        // 1. CITY SUGGESTIONS
+        $citySuggestions = $this->fetchCitiesFromAPI($baseUrl, $accessToken, $query, $cityLimit);
+
+        // 2. STATE SUGGESTIONS
+        $stateSuggestions = $this->fetchStatesFromAPI($baseUrl, $accessToken, $query, $stateLimit);
+
+        // 3. POSTAL CODE SUGGESTIONS
+        $postalSuggestions = $this->fetchPostalCodesFromAPI($baseUrl, $accessToken, $query, $postalLimit);
+
+        // Combine all place suggestions
+        return $citySuggestions->concat($stateSuggestions)->concat($postalSuggestions)->values();
+    }
+
+    private function fetchCitiesFromAPI($baseUrl, $accessToken, $query, $limit)
+    {
+        $params = [
             'access_token' => $accessToken,
             'limit' => $limit,
-            'fields' => 'City,StateOrProvince,PostalCode',
-            'groupBy' => 'City,StateOrProvince,PostalCode',
-            'q' => "City like '{$query}*' OR StateOrProvince like '{$query}*' OR PostalCode like '{$query}*'"
+            'fields' => 'City,StateOrProvince',
+            'groupBy' => 'City,StateOrProvince',
+            'q' => "City like '*{$query}*'"
         ];
-        
-        $response = Http::get($baseUrl, $queryParams);
-        
+
+        $response = Http::withOptions([
+            'verify' => false, // Disable SSL verification
+        ])->get($baseUrl, $params);
+
         if (!$response->successful()) {
-            Log::error('Bridge API request failed for place suggestions', [
+            \Log::warning('Failed to fetch city suggestions', [
                 'status' => $response->status(),
-                'response' => $response->json()
+                'body' => $response->body()
             ]);
-            return [];
+            return collect([]);
         }
-        
+
         $data = $response->json();
-        $places = $data['bundle'] ?? [];
-        
-        $results = [];
-        $cityCount = 0;
-        $stateCount = 0;
-        $postalCount = 0;
-        $cityLimit = ceil($limit / 3);
-        $stateLimit = ceil($limit / 3);
-        $postalLimit = $limit - $cityLimit - $stateLimit;
-        
-        // Process places by type
-        foreach ($places as $place) {
-            // Check if this is primarily a city match
-            if (!empty($place['City']) && stripos($place['City'], $query) !== false && $cityCount < $cityLimit) {
-                $results[] = [
-                    'type' => 'place',
-                    'place_type' => 'city',
-                    'name' => $place['City'],
-                    'state' => $place['StateOrProvince'],
-                    'display_text' => $place['City'] . ', ' . $place['StateOrProvince'],
-                    'action_url' => "/api/properties/search?city=" . urlencode($place['City'])
-                ];
-                $cityCount++;
-            }
-            // Check if this is primarily a state match
-            else if (!empty($place['StateOrProvince']) && stripos($place['StateOrProvince'], $query) !== false && $stateCount < $stateLimit) {
-                $fullStateName = $this->getFullStateName($place['StateOrProvince']);
-                $results[] = [
-                    'type' => 'place',
-                    'place_type' => 'state',
-                    'name' => $fullStateName,
-                    'code' => $place['StateOrProvince'],
-                    'display_text' => $fullStateName,
-                    'action_url' => "/api/properties/search?state=" . urlencode($place['StateOrProvince'])
-                ];
-                $stateCount++;
-            }
-            // Check if this is primarily a postal code match
-            else if (!empty($place['PostalCode']) && stripos($place['PostalCode'], $query) !== false && $postalCount < $postalLimit) {
-                $results[] = [
-                    'type' => 'place',
-                    'place_type' => 'postal_code',
-                    'name' => $place['PostalCode'],
-                    'display_text' => $place['PostalCode'] . ', ' . $place['StateOrProvince'],
-                    'action_url' => "/api/properties/search?postalCode=" . $place['PostalCode']
-                ];
-                $postalCount++;
-            }
+        $cities = $data['bundle'] ?? [];
+
+        return collect($cities)->map(function ($item) {
+            if (empty($item['City'])) return null;
+
+            return [
+                'type' => 'place',
+                'place_type' => 'city',
+                'name' => $item['City'],
+                'state' => $item['StateOrProvince'] ?? '',
+                'display_text' => $item['City'] . (isset($item['StateOrProvince']) ? ', ' . $item['StateOrProvince'] : ''),
+                'action_url' => "/properties/search?city=" . urlencode($item['City'])
+            ];
+        })->filter()->values();
+    }
+
+    private function fetchStatesFromAPI($baseUrl, $accessToken, $query, $limit)
+    {
+        $params = [
+            'access_token' => $accessToken,
+            'limit' => $limit,
+            'fields' => 'StateOrProvince',
+            'groupBy' => 'StateOrProvince',
+            'q' => "StateOrProvince like '*{$query}*'"
+        ];
+
+        $response = Http::withOptions([
+            'verify' => false, // Disable SSL verification
+        ])->get($baseUrl, $params);
+
+        if (!$response->successful()) {
+            \Log::warning('Failed to fetch state suggestions', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            return collect([]);
         }
-        
-        return $results;
-    };
-}
+
+        $data = $response->json();
+        $states = $data['bundle'] ?? [];
+
+        return collect($states)->map(function ($item) {
+            if (empty($item['StateOrProvince'])) return null;
+
+            $fullStateName = $this->getFullStateName($item['StateOrProvince']);
+
+            return [
+                'type' => 'place',
+                'place_type' => 'state',
+                'name' => $fullStateName ?? $item['StateOrProvince'],
+                'code' => $item['StateOrProvince'],
+                'display_text' => $fullStateName ?? $item['StateOrProvince'],
+                'action_url' => "/properties/search?state=" . urlencode($item['StateOrProvince'])
+            ];
+        })->filter()->values();
+    }
+
+    private function fetchPostalCodesFromAPI($baseUrl, $accessToken, $query, $limit)
+    {
+        $params = [
+            'access_token' => $accessToken,
+            'limit' => $limit,
+            'fields' => 'PostalCode,StateOrProvince',
+            'groupBy' => 'PostalCode,StateOrProvince',
+            'q' => "PostalCode like '*{$query}*'"
+        ];
+
+        $response = Http::withOptions([
+            'verify' => false, // Disable SSL verification
+        ])->get($baseUrl, $params);
+
+        if (!$response->successful()) {
+            \Log::warning('Failed to fetch postal code suggestions', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
+            return collect([]);
+        }
+
+        $data = $response->json();
+        $postalCodes = $data['bundle'] ?? [];
+
+        return collect($postalCodes)->map(function ($item) {
+            if (empty($item['PostalCode'])) return null;
+
+            return [
+                'type' => 'place',
+                'place_type' => 'postal_code',
+                'name' => $item['PostalCode'],
+                'display_text' => $item['PostalCode'] . (isset($item['StateOrProvince']) ? ', ' . $item['StateOrProvince'] : ''),
+                'action_url' => "/properties/search?postalCode=" . $item['PostalCode']
+            ];
+        })->filter()->values();
+    }
+
+
+
+    // Async version of building suggestions
+    // private function fetchBuildingSuggestionsAsync($baseUrl, $accessToken, $query, $type, $limit)
+    // {
+    //     // First, try to find buildings directly by searching for BuildingName
+    //     $buildingQueryParams = [
+    //         'access_token' => $accessToken,
+    //         'limit' => 200, // Get more results to ensure we find buildings with names
+    //         'fields' => 'ListingId,BuildingName,StreetNumber,StreetName,StreetDirPrefix,City,StateOrProvince,PostalCode,PropertySubType,PropertyType,ListPrice',
+    //         // Prioritize BuildingName in the search query
+    //         'q' => "BuildingName like '*{$query}*' OR CONCAT(StreetNumber,' ',StreetName) like '*{$query}*'"
+    //     ];
+
+    //     // Apply type filter if provided
+    //     if ($type) {
+    //         if (strtolower($type) === 'buy') {
+    //             $buildingQueryParams['PropertyType.ne'] = 'Residential Lease';
+    //         } elseif (strtolower($type) === 'rent') {
+    //             $buildingQueryParams['PropertyType'] = 'Residential Lease';
+    //         }
+    //     }
+
+    //     // Make the API request
+    //     $response = Http::get($baseUrl, $buildingQueryParams);
+
+    //     if (!$response->successful()) {
+    //         Log::error('Bridge API request failed for building suggestions', [
+    //             'status' => $response->status(),
+    //             'response' => $response->json()
+    //         ]);
+    //         return collect([]);
+    //     }
+
+    //     $data = $response->json();
+    //     $properties = $data['bundle'] ?? [];
+
+    //     // Group properties by building name first
+    //     $buildingGroups = [];
+
+    //     // First pass: group by BuildingName when available
+    //     foreach ($properties as $property) {
+    //         if (!empty($property['BuildingName'])) {
+    //             $buildingName = $property['BuildingName'];
+
+    //             if (!isset($buildingGroups[$buildingName])) {
+    //                 $buildingGroups[$buildingName] = [
+    //                     'properties' => [],
+    //                     'building_name' => $buildingName,
+    //                     'address' => trim($property['StreetNumber'] . ' ' . $property['StreetName']),
+    //                     'city' => $property['City'],
+    //                     'state' => $property['StateOrProvince'],
+    //                     'postal_code' => $property['PostalCode'] ?? '',
+    //                     'street_number' => $property['StreetNumber'],
+    //                     'street_name' => $property['StreetName'],
+    //                     'street_dir_prefix' => $property['StreetDirPrefix'] ?? '',
+    //                     'prices' => []
+    //                 ];
+    //             }
+
+    //             $buildingGroups[$buildingName]['properties'][] = $property;
+
+    //             if (isset($property['ListPrice']) && $property['ListPrice'] > 0) {
+    //                 $buildingGroups[$buildingName]['prices'][] = $property['ListPrice'];
+    //             }
+    //         }
+    //     }
+
+    //     // Second pass: group by address for properties without BuildingName
+    //     $addressGroups = [];
+
+    //     foreach ($properties as $property) {
+    //         // Skip if missing required fields
+    //         if (!isset($property['StreetNumber']) || !isset($property['StreetName'])) {
+    //             continue;
+    //         }
+
+    //         // Skip if this property was already grouped by BuildingName
+    //         if (!empty($property['BuildingName']) && isset($buildingGroups[$property['BuildingName']])) {
+    //             continue;
+    //         }
+
+    //         $addressKey = $property['StreetNumber'] . '-' . $property['StreetName'] . '-' . $property['City'];
+
+    //         if (!isset($addressGroups[$addressKey])) {
+    //             $addressGroups[$addressKey] = [
+    //                 'properties' => [],
+    //                 'building_name' => '', // Will be filled if any property has a BuildingName
+    //                 'address' => trim($property['StreetNumber'] . ' ' . $property['StreetName']),
+    //                 'city' => $property['City'],
+    //                 'state' => $property['StateOrProvince'],
+    //                 'postal_code' => $property['PostalCode'] ?? '',
+    //                 'street_number' => $property['StreetNumber'],
+    //                 'street_name' => $property['StreetName'],
+    //                 'street_dir_prefix' => $property['StreetDirPrefix'] ?? '',
+    //                 'prices' => []
+    //             ];
+    //         }
+
+    //         // If this property has a BuildingName, use it for the whole address group
+    //         if (!empty($property['BuildingName']) && empty($addressGroups[$addressKey]['building_name'])) {
+    //             $addressGroups[$addressKey]['building_name'] = $property['BuildingName'];
+    //         }
+
+    //         $addressGroups[$addressKey]['properties'][] = $property;
+
+    //         if (isset($property['ListPrice']) && $property['ListPrice'] > 0) {
+    //             $addressGroups[$addressKey]['prices'][] = $property['ListPrice'];
+    //         }
+    //     }
+
+    //     // Filter address groups to only include those with multiple properties (actual buildings)
+    //     $addressGroups = array_filter($addressGroups, function($group) {
+    //         return count($group['properties']) > 1;
+    //     });
+
+    //     // Combine the two sets of buildings
+    //     $allBuildings = array_values($buildingGroups);
+
+    //     // Add address-based buildings that have a building name
+    //     foreach ($addressGroups as $group) {
+    //         if (!empty($group['building_name'])) {
+    //             $allBuildings[] = $group;
+    //         }
+    //     }
+
+    //     // If we don't have enough results, add address-based buildings without names
+    //     if (count($allBuildings) < $limit) {
+    //         foreach ($addressGroups as $group) {
+    //             if (empty($group['building_name'])) {
+    //                 // For buildings without a name, try to create a descriptive name
+    //                 $propertyTypes = array_unique(array_map(function($prop) {
+    //                     return $prop['PropertySubType'] ?? '';
+    //                 }, $group['properties']));
+
+    //                 $commonType = !empty($propertyTypes) ? reset($propertyTypes) : '';
+
+    //                 if (!empty($commonType)) {
+    //                     // Create a name like "400 Main St Condominiums"
+    //                     $group['building_name'] = $group['address'] . ' ' . $commonType;
+    //                 } else {
+    //                     // Just use the address
+    //                     $group['building_name'] = $group['address'];
+    //                 }
+
+    //                 $allBuildings[] = $group;
+
+    //                 if (count($allBuildings) >= $limit) {
+    //                     break;
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     // Sort buildings by relevance to the query
+    //     usort($allBuildings, function($a, $b) use ($query) {
+    //         // Buildings with names that match the query come first
+    //         $aNameMatch = stripos($a['building_name'], $query) !== false;
+    //         $bNameMatch = stripos($b['building_name'], $query) !== false;
+
+    //         if ($aNameMatch && !$bNameMatch) return -1;
+    //         if (!$aNameMatch && $bNameMatch) return 1;
+
+    //         // Then buildings with addresses that match the query
+    //         $aAddressMatch = stripos($a['address'], $query) !== false;
+    //         $bAddressMatch = stripos($b['address'], $query) !== false;
+
+    //         if ($aAddressMatch && !$bAddressMatch) return -1;
+    //         if (!$aAddressMatch && $bAddressMatch) return 1;
+
+    //         // Then sort by number of units (more units first)
+    //         return count($b['properties']) - count($a['properties']);
+    //     });
+
+    //     // Format the results
+    //     $results = collect(array_slice($allBuildings, 0, $limit))->map(function($building) {
+    //         $prices = $building['prices'];
+    //         $minPrice = !empty($prices) ? min($prices) : null;
+    //         $maxPrice = !empty($prices) ? max($prices) : null;
+
+    //         return [
+    //             'type' => 'building',
+    //             'building_name' => $building['building_name'],
+    //             'address' => $building['address'],
+    //             'city' => $building['city'],
+    //             'state' => $building['state'],
+    //             'postal_code' => $building['postal_code'],
+    //             'street_number' => $building['street_number'],
+    //             'street_name' => $building['street_name'],
+    //             'street_dir_prefix' => $building['street_dir_prefix'],
+    //             'unit_count' => count($building['properties']),
+    //             'min_price' => $minPrice,
+    //             'max_price' => $maxPrice,
+    //             'display_text' => $building['building_name'] . 
+    //                 ($building['city'] ? ', ' . $building['city'] : '') . 
+    //                 ($building['state'] ? ', ' . $building['state'] : '') . 
+    //                 ' (' . count($building['properties']) . ' units)',
+    //             'action_url' => "/api/buildings?street_number={$building['street_number']}&street_name=" . urlencode($building['street_name'])
+    //         ];
+    //     });
+
+    //     return $results;
+    // }
+
+    // Async version of place suggestions
+    // private function fetchPlaceSuggestionsAsync($baseUrl, $accessToken, $query, $limit)
+    // {
+    //     return function() use ($baseUrl, $accessToken, $query, $limit) {
+    //         // Combine places into a single API call if possible
+    //         $queryParams = [
+    //             'access_token' => $accessToken,
+    //             'limit' => $limit,
+    //             'fields' => 'City,StateOrProvince,PostalCode',
+    //             'groupBy' => 'City,StateOrProvince,PostalCode',
+    //             'q' => "City like '{$query}*' OR StateOrProvince like '{$query}*' OR PostalCode like '{$query}*'"
+    //         ];
+
+    //         $response = Http::get($baseUrl, $queryParams);
+
+    //         if (!$response->successful()) {
+    //             Log::error('Bridge API request failed for place suggestions', [
+    //                 'status' => $response->status(),
+    //                 'response' => $response->json()
+    //             ]);
+    //             return [];
+    //         }
+
+    //         $data = $response->json();
+    //         $places = $data['bundle'] ?? [];
+
+    //         $results = [];
+    //         $cityCount = 0;
+    //         $stateCount = 0;
+    //         $postalCount = 0;
+    //         $cityLimit = ceil($limit / 3);
+    //         $stateLimit = ceil($limit / 3);
+    //         $postalLimit = $limit - $cityLimit - $stateLimit;
+
+    //         // Process places by type
+    //         foreach ($places as $place) {
+    //             // Check if this is primarily a city match
+    //             if (!empty($place['City']) && stripos($place['City'], $query) !== false && $cityCount < $cityLimit) {
+    //                 $results[] = [
+    //                     'type' => 'place',
+    //                     'place_type' => 'city',
+    //                     'name' => $place['City'],
+    //                     'state' => $place['StateOrProvince'],
+    //                     'display_text' => $place['City'] . ', ' . $place['StateOrProvince'],
+    //                     'action_url' => "/api/properties/search?city=" . urlencode($place['City'])
+    //                 ];
+    //                 $cityCount++;
+    //             }
+    //             // Check if this is primarily a state match
+    //             else if (!empty($place['StateOrProvince']) && stripos($place['StateOrProvince'], $query) !== false && $stateCount < $stateLimit) {
+    //                 $fullStateName = $this->getFullStateName($place['StateOrProvince']);
+    //                 $results[] = [
+    //                     'type' => 'place',
+    //                     'place_type' => 'state',
+    //                     'name' => $fullStateName,
+    //                     'code' => $place['StateOrProvince'],
+    //                     'display_text' => $fullStateName,
+    //                     'action_url' => "/api/properties/search?state=" . urlencode($place['StateOrProvince'])
+    //                 ];
+    //                 $stateCount++;
+    //             }
+    //             // Check if this is primarily a postal code match
+    //             else if (!empty($place['PostalCode']) && stripos($place['PostalCode'], $query) !== false && $postalCount < $postalLimit) {
+    //                 $results[] = [
+    //                     'type' => 'place',
+    //                     'place_type' => 'postal_code',
+    //                     'name' => $place['PostalCode'],
+    //                     'display_text' => $place['PostalCode'] . ', ' . $place['StateOrProvince'],
+    //                     'action_url' => "/api/properties/search?postalCode=" . $place['PostalCode']
+    //                 ];
+    //                 $postalCount++;
+    //             }
+    //         }
+
+    //         return $results;
+    //     };
+    // }
 
 
 }

@@ -1283,7 +1283,7 @@ class PropertyController extends Controller
 
     public function getProperties(Request $request)
     {
-
+        // dd("dfdsf");
         if (!$request->has('type') || $request->type === null) {
             $request->merge(['type' => 'buy']);
         }
@@ -1383,14 +1383,14 @@ class PropertyController extends Controller
                 $queryParams['PostalCode'] = $request->postal_code;
             }
         }
-
+        
         // Apply common filters
         $this->applyBridgeApiFilters($queryParams, $request);
-
+        
         // Apply sorting
         $sortBy = $request->input('sort_by', 'list_price');
         $sortDir = $request->input('sort_dir', 'asc');
-
+        
         // Map our sort fields to Bridge API field names
         $sortFieldMap = [
             'list_price' => 'ListPrice',
@@ -1407,7 +1407,12 @@ class PropertyController extends Controller
 
         try {
             // Make the API request
-            $response = Http::get($baseUrl, $queryParams);
+        $baseUrl = 'https://api.bridgedataoutput.com/api/v2/miamire/listings';
+
+        // dd($queryParams,"ggdfgd");
+        $response = Http::withOptions([
+        'verify' => false, // Disable SSL verification
+    ])->get($baseUrl, $queryParams);
 
             if (!$response->successful()) {
                 Log::error('Bridge API request failed', [
@@ -3031,10 +3036,16 @@ class PropertyController extends Controller
         $accessToken = 'f091fc0d25a293957350aa6a022ea4fb';
 
         try {
-            // Make API request to fetch the property by listing ID or listing key
-            $response = Http::get($baseUrl . '/' . $listingId, [
+
+              $response = Http::withOptions([
+            'verify' => false, // Disable SSL verification
+        ])->get($baseUrl . '/' . $listingId, [
                 'access_token' => $accessToken
             ]);
+            // // Make API request to fetch the property by listing ID or listing key
+            // $response = Http::get($baseUrl . '/' . $listingId, [
+            //     'access_token' => $accessToken
+            // ]);
 
             // Check if the request was successful
             if (!$response->successful()) {
@@ -3272,8 +3283,11 @@ class PropertyController extends Controller
         ];
 
         try {
+            $response = Http::withOptions([
+            'verify' => false, // Disable SSL verification
+        ])->get($apiUrl, $queryParams);
             // Make the API request
-            $response = Http::get($apiUrl, $queryParams);
+            // $response = Http::get($apiUrl, $queryParams);
 
             // Check if the request was successful
             if (!$response->successful()) {
