@@ -2195,7 +2195,7 @@ public function autocomplete(Request $request)
 {
     $query = $request->input('q') ?? $request->input('query');
     $type = $request->input('type');
-    $limit = $request->input('limit', 10);
+    $limit = $request->input('limit', 5);
 
     if (empty($query) || strlen($query) < 1) {
         return response()->json([
