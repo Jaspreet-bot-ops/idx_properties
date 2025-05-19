@@ -2312,6 +2312,8 @@ public function autocomplete(Request $request)
         return [
             'type' => 'address',
             'address' => $property['UnparsedAddress'],
+            'property_id'=> $property['ListingId'],
+            'listing_id'=> $property['ListingId'],
             'city' => $property['City'] ?? '',
             'state' => $property['StateOrProvince'] ?? '',
             'postal_code' => $property['PostalCode'] ?? '',
@@ -2400,7 +2402,10 @@ public function autocomplete(Request $request)
         }
 
         // Make the API request - DISABLE SSL VERIFICATION
-        $response = Http::withOptions([
+        // $response = Http::withOptions([
+        //     'verify' => false, // Disable SSL verification
+        // ])->get($baseUrl, $params);
+            $response = Http::withOptions([
             'verify' => false, // Disable SSL verification
         ])->get($baseUrl, $params);
 
