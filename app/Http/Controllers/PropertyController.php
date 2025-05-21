@@ -1297,7 +1297,7 @@ class PropertyController extends Controller
             'city' => 'nullable|string',
             'state' => 'nullable|string',
             'postal_code' => 'nullable|string',
-            'type' => 'nullable|string|in:buy,rent,all',
+            'type' => 'nullable|string|in:buy,rent,sold,all',
             'property_sub_type' => 'nullable|string',
             'features' => 'nullable|string',
             'min_price' => 'nullable|numeric',
@@ -1469,6 +1469,9 @@ class PropertyController extends Controller
                 $queryParams['PropertyType'] = 'Residential Lease';
                 $queryParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
                 // $queryParams['PropertySubType'] = 'Rental';
+            }else if ($request->type === 'sold') {
+                $queryParams['PropertyType'] = 'Residential';
+                $queryParams['StandardStatus'] = 'Closed';
             }
         }
 
