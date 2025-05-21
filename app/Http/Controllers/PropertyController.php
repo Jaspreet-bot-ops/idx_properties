@@ -1470,7 +1470,7 @@ class PropertyController extends Controller
                 $queryParams['StandardStatus.in'] = 'Active,Active Under Contract,Pending';
                 // $queryParams['PropertySubType'] = 'Rental';
             }else if ($request->type === 'sold') {
-                $queryParams['PropertyType'] = 'Residential';
+                $queryParams['PropertyType.in'] = 'Residential,Residential Lease';
                 $queryParams['StandardStatus'] = 'Closed';
             }
         }
