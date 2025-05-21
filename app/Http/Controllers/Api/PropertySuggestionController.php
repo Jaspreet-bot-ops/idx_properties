@@ -2287,6 +2287,8 @@ public function autocomplete(Request $request)
                 'building_name' => $name,
                 'address' => $address,
                 'city' => $property['City'] ?? '',
+                'street_number' => $property['StreetNumber'] ??'',
+                'street_name' => $property['StreetName'] ??'',
                 'state' => $property['StateOrProvince'] ?? '',
                 'postal_code' => $property['PostalCode'] ?? '',
                 'image_url' => $image,
